@@ -4,6 +4,8 @@ import { CHARACTERS } from "./data.js";
 import { portrait } from "./art.js";
 import { hostRoom, joinRoom, makeRoomCode, cleanCode, myClientId } from "./net.js";
 import { AI_LEVELS, cpuName } from "./ai.js";
+import { RULES } from "./data.js";
+import { clampMoney, moneyPickerHtml, moneyLabel } from "./money.js";
 
 const PROFILE_KEY = "rizolopy-online-profile";
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -31,7 +33,8 @@ export function initOnline(api) {
   let room = null;
   let role = null;          // host | guest
   let inGame = false;
-  let lobby = { players: [], maxRounds: 20 };
+  let lobby = { players: [], maxRounds: 20, startMoney: RULES.startMoney };
+  let moneyCustom = false;
   let hostPlays = true;
   let joinCode = "";
   let error = "";
@@ -138,8 +141,10 @@ export function initOnline(api) {
             </div>
             <div class="setup-row"><label>Game length</label><div class="seg" id="olRounds">${[[10, "Short · 10"], [20, "Normal · 20"], [0, "No limit"]]
               .map(([n, l]) => `<button class="${n === lobby.maxRounds ? "on" : ""}" data-olr="${n}">${l}</button>`).join("")}</div></div>
+            <div class="setup-row"><label>Starting money</label><div class="seg" id="olMoney">${moneyPickerHtml(lobby.startMoney, moneyCustom, "olmoney")}</div></div>
             <button class="btn btn-maroon big" data-ol="start" ${enough ? "" : "disabled"}>${enough ? `Start game with ${lobby.players.length} players` : humans ? "Waiting for at least 2 players" : "Add at least one person to play"}</button>`
-            : `<p class="ol-waiting">⏳ Waiting for the host to start the game…</p>`}
+            : `<p class="ol-settings muted">Game length: <b>${lobby.maxRounds ? `${lobby.maxRounds} rounds` : "No limit"}</b> · Starting money: <b>${moneyLabel(lobby.startMoney)}</b> each</p>
+              <p class="ol-waiting">⏳ Waiting for the host to start the game…</p>`}
         </div>
       </div>
       ${me ? `<div class="slot ol-me"><b>Your character</b>${charPicker(me.char, taken)}</div>` : ""}
@@ -149,7 +154,7 @@ export function initOnline(api) {
 
   /* ---------------- host ---------------- */
   function hostLobbyBroadcast() {
-    room.send({ t: "lobby", players: lobby.players, maxRounds: lobby.maxRounds });
+    room.send({ t: "lobby", players: lobby.players, maxRounds: lobby.maxRounds, startMoney: lobby.startMoney });
     if (view === "hostLobby") render();
   }
 
@@ -215,7 +220,7 @@ export function initOnline(api) {
       view = "menu"; error = e.message; role = null; render(); return;
     }
     status = null;
-    lobby = { players: hostPlays ? [{ cid, name: profile.name.trim(), char: profile.char, host: true }] : [], maxRounds: lobby.maxRounds };
+    lobby = { players: hostPlays ? [{ cid, name: profile.name.trim(), char: profile.char, host: true }] : [], maxRounds: lobby.maxRounds, startMoney: lobby.startMoney };
     view = "hostLobby";
     hostLobbyBroadcast();
   }
@@ -237,14 +242,14 @@ export function initOnline(api) {
     if (lobby.players.length < 2) return;
     if (!lobby.players.some(p => !p.ai)) return;
     inGame = true;
-    api.hostStart(room, lobby.players.map(p => ({ cid: p.cid, name: p.name, char: p.char, ai: p.ai || null })), lobby.maxRounds, cid);
+    api.hostStart(room, lobby.players.map(p => ({ cid: p.cid, name: p.name, char: p.char, ai: p.ai || null })), lobby.maxRounds, cid, lobby.startMoney);
   }
 
   /* ---------------- guest ---------------- */
   function guestOnMessage(m) {
     if (inGame) { api.gameMessage(m); return; }
     if (m.t === "lobby") {
-      lobby = { players: m.players, maxRounds: m.maxRounds };
+      lobby = { players: m.players, maxRounds: m.maxRounds, startMoney: clampMoney(m.startMoney ?? RULES.startMoney) };
       const me = lobby.players.find(p => p.cid === cid);
       if (me) { profile.char = me.char; saveProfile(); }
       status = null;
@@ -287,10 +292,16 @@ export function initOnline(api) {
 
   function leave() {
     if (room) room.close();
-    room = null; role = null; inGame = false; view = "menu"; status = null; lobby = { players: [], maxRounds: lobby.maxRounds };
+    const keep = role === "host" ? lobby : { maxRounds: 20, startMoney: RULES.startMoney };
+    room = null; role = null; inGame = false; view = "menu"; status = null; lobby = { players: [], maxRounds: keep.maxRounds, startMoney: keep.startMoney };
   }
 
   /* ---------------- wiring ---------------- */
+  document.addEventListener("change", e => {
+    if (role !== "host" || !e.target.matches("[data-olmoney-input]")) return;
+    lobby.startMoney = clampMoney(e.target.value);
+    hostLobbyBroadcast();
+  });
   document.addEventListener("click", e => {
     if (!$("#online").classList.contains("active")) return;
     const ch = e.target.closest("[data-olchar]");
@@ -307,6 +318,14 @@ export function initOnline(api) {
     if (cpuRm && role === "host") { removeCpu(cpuRm.dataset.olcpuRemove); return; }
     const r = e.target.closest("[data-olr]");
     if (r) { lobby.maxRounds = Number(r.dataset.olr); hostLobbyBroadcast(); return; }
+    const mb = e.target.closest("[data-olmoney]");
+    if (mb && role === "host") {
+      if (mb.dataset.olmoney === "custom") moneyCustom = true;
+      else { moneyCustom = false; lobby.startMoney = Number(mb.dataset.olmoney); }
+      hostLobbyBroadcast();
+      if (moneyCustom) document.querySelector("[data-olmoney-input]")?.focus();
+      return;
+    }
     const b = e.target.closest("[data-ol]");
     if (!b) return;
     const act = b.dataset.ol;
