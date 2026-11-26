@@ -3,7 +3,8 @@ import { GROUPS, TILES, EXILE_INDEX, CHARACTERS, NOLI_CARDS, FILI_CARDS, QUIZ, R
 import { FX } from "./fx.js";
 import { createBoard } from "./board.js";
 import { gsap } from "gsap";
-import { portrait } from "./art.js";
+import { portrait, portraitUrl } from "./art.js";
+import { initOnline } from "./online.js";
 
 export function boot() {
 
@@ -25,6 +26,7 @@ export function boot() {
   let G = null;          // current game state
   let busy = false;      // true while an animation / modal flow is running
   let board = null;      // Phaser board scene
+  let NET = null;        // online game: { role: "host" | "guest", room, cid, mySeat }
 
   /* =========================================================
      Board rendering
@@ -99,6 +101,7 @@ export function boot() {
   }
 
   function save() {
+    if (isGuest()) return;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* storage unavailable */ }
   }
   function loadSave() {
@@ -192,6 +195,7 @@ export function boot() {
     const d1 = 1 + Math.floor(Math.random() * 6);
     const d2 = 1 + Math.floor(Math.random() * 6);
     FX.sound.dice();
+    emit("dice", { d: [d1, d2] });
     await board.rollDice(d1, d2);
     G.lastDice = [d1, d2];
     return [d1, d2];
@@ -261,12 +265,13 @@ export function boot() {
     for (let s = 0; s < Math.abs(steps); s++) {
       p.pos = (p.pos + dir + TILES.length) % TILES.length;
       FX.sound.step();
+      emit("hop", { pi, pos: p.pos, fast });
       await board.hop(G, pi, p.pos, fast);
       if (dir > 0 && p.pos === 0) {
         p.money += RULES.passStart;
         log(`${p.name} passed START and collected ${peso(RULES.passStart)}.`);
-        toast(`${p.name} collects ${peso(RULES.passStart)} for passing START`);
-        FX.sound.coin();
+        toast(`${p.name} collects ${peso(RULES.passStart)} for passing START`, true);
+        sfx("coin");
       }
       refresh();
     }
@@ -290,7 +295,8 @@ export function boot() {
     p.inExile = true;
     p.exileTries = 0;
     G.doubles = 0;
-    FX.sound.exile();
+    sfx("exile");
+    emit("teleport", { pi, pos: EXILE_INDEX });
     await board.teleport(G, pi, EXILE_INDEX);
     refresh();
     await alertModal("Exiled to Dapitan 🌴", `<p><b>${esc(p.name)}</b> is sent to Dapitan Exile and does not pass START.</p>
@@ -313,7 +319,7 @@ export function boot() {
         const owner = G.players[own.owner];
         const rent = rentFor(i);
         await alertModal(`Rent due at ${t.name}`, `${deedHtml(i)}<p><b>${esc(p.name)}</b> pays <b>${peso(rent)}</b> rent to <b>${esc(owner.name)}</b>.</p>`, "Pay rent");
-        FX.sound.pay();
+        sfx("pay");
         const ok = await pay(pi, own.owner, rent);
         log(`${p.name} paid ${peso(rent)} rent to ${owner.name} for ${t.name}.`);
         if (ok) G.msg = `${p.name} paid ${peso(rent)} rent to ${owner.name}.`;
@@ -348,14 +354,14 @@ export function boot() {
     if (choice === "buy") {
       p.money -= t.price;
       G.owned[i] = { owner: pi, level: 0 };
-      FX.sound.coin();
+      sfx("coin");
       stampTile(i);
       log(`${p.name} bought ${t.name} for ${peso(t.price)}.`);
       G.msg = `${p.name} bought ${t.name}!`;
       if (ownsGroup(pi, t.group)) {
         log(`${p.name} now owns all of ${GROUPS[t.group].name}. Rent doubles and landmarks can be built.`);
-        toast(`${p.name} completed the ${GROUPS[t.group].name} group!`);
-        board.confetti(120);
+        toast(`${p.name} completed the ${GROUPS[t.group].name} group!`, true);
+        confetti(120);
       }
     } else {
       G.msg = `${p.name} decided not to buy ${t.name}.`;
@@ -366,8 +372,9 @@ export function boot() {
     const p = G.players[pi];
     const deck = kind === "noli" ? NOLI_CARDS : FILI_CARDS;
     const card = deck[drawFrom(kind + "Deck", deck)];
+    emit("cardFly", { kind });
     await board.drawCardFly(kind);
-    FX.sound.card();
+    sfx("card");
     await alertModal(null, `<div class="flip-scene"><div class="flip-card">
         <div class="flip-back ${kind}"><span>${kind === "noli" ? "📖" : "🗡️"}</span><b>${kind.toUpperCase()}</b></div>
         <div class="card-face ${kind}"><div class="ct">${kind === "noli" ? "📖" : "🗡️"} ${kind.toUpperCase()}</div>
@@ -400,26 +407,22 @@ export function boot() {
     const p = G.players[pi];
     const q = QUIZ[drawFrom("quizDeck", QUIZ)];
     const order = shuffle(q.a.map((_, k) => k));
-    const correct = await new Promise(resolve => {
-      openModal(`<h2>❓ Quiz Corner</h2><p><b>${esc(p.name)}</b>, answer for ${peso(RULES.quizReward)}:</p>
+    const k = Number(await modal({
+      body: `<h2>❓ Quiz Corner</h2><p><b>${esc(p.name)}</b>, answer for ${peso(RULES.quizReward)}:</p>
         <p style="font-size:1.15rem;font-weight:700">${esc(q.q)}</p>
-        <div class="quiz-opts">${order.map(k => `<button data-k="${k}">${esc(q.a[k])}</button>`).join("")}</div>`, []);
-      $("#modalBody").querySelectorAll(".quiz-opts button").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const k = Number(btn.dataset.k);
-          $("#modalBody").querySelectorAll(".quiz-opts button").forEach(b => {
-            b.disabled = true;
-            if (Number(b.dataset.k) === q.c) b.classList.add("right");
-          });
-          if (k !== q.c) { btn.classList.add("wrong"); FX.sound.wrong(); } else { FX.sound.right(); }
-          setTimeout(() => { closeModal(); resolve(k === q.c); }, 1300);
-        });
-      });
-    });
+        <div class="quiz-opts">${order.map(k => `<button data-choice="${k}">${esc(q.a[k])}</button>`).join("")}</div>`,
+      buttons: [], decider: pi, keepOpen: true,
+    }));
+    const correct = k === q.c;
+    revealQuiz(k, q.c);
+    emit("quizReveal", { k, c: q.c });
+    sfx(correct ? "right" : "wrong");
+    await sleep(1300);
+    endModal();
     if (correct) {
       p.money += RULES.quizReward;
       log(`${p.name} answered the quiz correctly and earned ${peso(RULES.quizReward)}.`);
-      board.confetti(90);
+      confetti(90);
       G.msg = `Correct! ${p.name} earns ${peso(RULES.quizReward)}.`;
     } else {
       log(`${p.name} missed the quiz question.`);
@@ -488,9 +491,10 @@ export function boot() {
       .sort((a, b) => b.worth - a.worth);
     const winner = ranking[0].p;
     log(`🏆 ${winner.name} wins!`);
-    FX.sound.fanfare();
+    sfx("fanfare");
     FX.confetti(5000, 260);
-    board.confetti(240);
+    emit("bigConfetti");
+    confetti(240);
     G.msg = `🏆 ${winner.name} wins!`;
     save(); refresh();
     showWinner(reason, ranking);
@@ -504,10 +508,11 @@ export function boot() {
         <h2>🏆 ${esc(w.name)} wins!</h2><p class="muted">${esc(reason)} The wealthiest player builds the greatest legacy.</p></div>
         <ul class="winner-list">${ranking.map(r => `<li><span>${portrait(charById(r.p.char))} ${esc(r.p.name)}</span><span>${r.p.bankrupt ? "Bankrupt" : peso(r.worth)}</span></li>`).join("")}</ul>
         <p class="fact">Net worth counts cash plus the price of every place and landmark owned.</p>`,
-      buttons: [
+      buttons: NET ? [{ label: "View board", value: "stay", cls: "btn-outline" }] : [
         { label: "View board", value: "stay", cls: "btn-outline" },
         { label: "Play again", value: "again", cls: "btn-maroon" },
       ],
+      decider: NET ? "all" : undefined,
     });
     if (choice === "again") { clearSave(); showScreen("setup"); }
   }
@@ -524,10 +529,10 @@ export function boot() {
     if (p.money < cost) { toast(`You need ${peso(cost)} to build here.`); return; }
     p.money -= cost;
     own.level++;
-    FX.sound.build();
+    sfx("build");
     stampTile(i);
     log(`${p.name} built a landmark on ${TILES[i].name} for ${peso(cost)}. Rent is now ${peso(rentFor(i))}.`);
-    toast(`Landmark built on ${TILES[i].name}! Rent is now ${peso(rentFor(i))}`);
+    toast(`Landmark built on ${TILES[i].name}! Rent is now ${peso(rentFor(i))}`, true);
     save(); refresh();
   }
 
@@ -536,13 +541,17 @@ export function boot() {
      ========================================================= */
   function refresh() {
     if (!G) return;
+    queueState();
     const p = cur();
-    if (board) board.sync(G, { busy, msg: G.msg });
+    const act = canAct();
+    if (board) board.sync(G, { busy, msg: G.msg, canAct: act });
     $("#roundInfo").textContent = G.maxRounds ? `Round ${G.round} of ${G.maxRounds}` : `Round ${G.round}`;
 
     $("#playerList").innerHTML = G.players.map((pl, i) => {
       const ch = charById(pl.char);
       const tags = pl.bankrupt ? `<span class="tag">💀 Bankrupt</span>` : [
+        NET && pl.cid === NET.cid ? `<span class="tag">You</span>` : "",
+        NET && pl.offline ? `<span class="tag">📴 Offline</span>` : "",
         pl.inExile ? `<span class="tag">🌴 Exiled</span>` : "",
         pl.freeExit ? `<span class="tag">✉️ Letter</span>` : "",
       ].join("");
@@ -564,11 +573,14 @@ export function boot() {
     }
     lastMoney = G.players.map(pl => pl.money);
 
-    const mine = propsOf(G.turn);
-    $("#myProps").innerHTML = mine.length === 0 ? `<p class="muted" style="margin:0">${esc(p.name)} owns no places yet.</p>`
+    // online, "Your places" shows your own seat; on a shared device it shows whoever's turn it is
+    const seat = NET && NET.mySeat >= 0 ? NET.mySeat : G.turn;
+    const sp = G.players[seat];
+    const mine = propsOf(seat);
+    $("#myProps").innerHTML = mine.length === 0 ? `<p class="muted" style="margin:0">${esc(sp.name)} owns no places yet.</p>`
       : mine.map(i => {
         const t = TILES[i], own = G.owned[i];
-        const canBuild = ownsGroup(G.turn, t.group) && own.level < RULES.maxUpgrades && G.phase !== "over" && !busy;
+        const canBuild = seat === G.turn && act && ownsGroup(G.turn, t.group) && own.level < RULES.maxUpgrades && G.phase !== "over" && !busy;
         return `<div class="prop-row"><span class="sw" style="background:${GROUPS[t.group].color}"></span>
           <span class="nm">${t.icon} ${esc(t.name)} ${"🏛".repeat(own.level)}</span>
           <span class="muted">rent ${peso(rentFor(i))}</span>
@@ -580,7 +592,9 @@ export function boot() {
 
   let lastMoney = null;
 
-  function stampTile(i) { board.stamp(i); }
+  function stampTile(i) { emit("stamp", { i }); board.stamp(i); }
+  function confetti(n) { emit("confetti", { n }); board.confetti(n); }
+  function sfx(name) { FX.sound[name](); emit("sfx", { s: name }); }
 
   function updateMute() {
     $("#muteBtn").textContent = FX.isMuted() ? "🔇" : "🔊";
@@ -597,9 +611,10 @@ export function boot() {
       <div class="avatar splash-avatar" style="background:${c.color}">${portrait(c)}</div>
       <div class="splash-name">${esc(p.name)}</div>
       <div class="splash-char">${esc(c.name)}</div>
-      <div class="splash-hint">${p.inExile ? "🌴 You are in Dapitan Exile" : "Pass the device · tap to start your turn"}</div></div>`;
+      <div class="splash-hint">${splashHint(p)}</div></div>`;
     sp.classList.remove("hidden");
     FX.sound.turn();
+    emit("splash");
     const tl = gsap.timeline();
     tl.fromTo(sp, { opacity: 0 }, { opacity: 1, duration: 0.25 })
       .from(".splash-round", { y: -30, opacity: 0, duration: 0.35 }, 0.05)
@@ -617,23 +632,37 @@ export function boot() {
     });
   }
 
-  function highlight(i) { board.highlight(i); }
+  function highlight(i) { emit("highlight", { i }); board.highlight(i); }
+
+  function splashHint(p) {
+    if (p.inExile) return NET && NET.mySeat !== G.turn ? `🌴 ${esc(p.name)} is in Dapitan Exile` : "🌴 You are in Dapitan Exile";
+    if (!NET) return "Pass the device · tap to start your turn";
+    if (NET.mySeat === G.turn) return "🎲 Your turn!";
+    return `Watch ${esc(p.name)}'s turn`;
+  }
 
   /* =========================================================
      Modals and toasts
      ========================================================= */
   let modalResolve = null;
-  function openModal(bodyHtml, buttons) {
-    $("#modalBody").innerHTML = bodyHtml;
+  let modalPick = null;   // when set, a button press calls this instead of closing the dialog
+  /** opts: { locked: buttons disabled, waiting: note under the body, onPick(value) } */
+  function openModal(bodyHtml, buttons, opts = {}) {
+    modalPick = opts.onPick || null;
+    $("#modalBody").innerHTML = bodyHtml + (opts.waiting ? `<p class="net-wait">${opts.waiting}</p>` : "");
     const bw = $("#modalButtons");
     bw.innerHTML = "";
     buttons.forEach(b => {
       const el = document.createElement("button");
       el.className = "btn " + (b.cls || "btn-maroon");
       el.textContent = b.label;
-      el.disabled = !!b.disabled;
-      el.addEventListener("click", () => { const r = modalResolve; closeModal(); r && r(b.value); });
+      el.disabled = !!b.disabled || !!opts.locked;
+      el.addEventListener("click", () => pickModal(b.value));
       bw.appendChild(el);
+    });
+    $("#modalBody").querySelectorAll("[data-choice]").forEach(el => {
+      el.disabled = !!opts.locked;
+      el.addEventListener("click", () => pickModal(el.dataset.choice));
     });
     bw.classList.toggle("hidden", buttons.length === 0);
     $("#modal").classList.remove("hidden");
@@ -642,15 +671,79 @@ export function boot() {
     const first = bw.querySelector("button:not(:disabled):last-child") || bw.querySelector("button:not(:disabled)");
     first && first.focus();
   }
+  function pickModal(v) {
+    if (modalPick) { modalPick(v); return; }
+    const r = modalResolve; closeModal(); r && r(v);
+  }
+  function lockModal() { $("#modal").querySelectorAll("button").forEach(b => { b.disabled = true; }); }
   let lastOverlayClose = 0;
-  function closeModal() { $("#modal").classList.add("hidden"); modalResolve = null; lastOverlayClose = Date.now(); }
-  function modal({ body, buttons }) {
-    return new Promise(resolve => { openModal(body, buttons); modalResolve = resolve; });
+  function closeModal() { $("#modal").classList.add("hidden"); modalResolve = null; modalPick = null; lastOverlayClose = Date.now(); }
+
+  /**
+   * A game dialog. `decider` is the player who answers (default: whoever's turn it is; "all" = each screen answers
+   * for itself). Online, the host shows it on every screen and waits for the decider's screen to answer.
+   * keepOpen: the dialog stays up (locked) after the answer until endModal().
+   */
+  let netModal = null, modalSeq = 0;
+  function modal({ body, buttons, decider, keepOpen, local }) {
+    if (!isHost() || local || !G) {
+      return new Promise(resolve => {
+        const done = v => { resolve(v); if (local) restoreNetModal(); };
+        openModal(body, buttons, keepOpen ? { onPick: v => { lockModal(); modalPick = () => {}; resolve(v); } } : {});
+        modalResolve = done;
+      });
+    }
+    return new Promise(resolve => {
+      const mid = ++modalSeq;
+      netModal = { mid, body, buttons, decider: decider === undefined ? G.turn : decider, keepOpen, resolve };
+      emit("modal", { mid, body: packHtml(body), buttons, decider: netModal.decider });
+      showNetModal();
+    });
+  }
+  function showNetModal() {
+    const m = netModal;
+    if (!m || m.answered) return;
+    const who = typeof m.decider === "number" ? G.players[m.decider] : null;
+    const mine = !who || hostControls(m.decider);
+    openModal(m.body, m.buttons, {
+      locked: !mine,
+      waiting: !mine ? `⏳ Waiting for ${esc(who.name)}…` : (who && who.cid !== NET.cid ? `📴 ${esc(who.name)} is offline, so you choose for them.` : ""),
+      onPick: v => resolveNetModal(m.mid, v),
+    });
+  }
+  function resolveNetModal(mid, v) {
+    const m = netModal;
+    if (!m || m.mid !== mid || m.answered) return;
+    m.answered = true;
+    if (m.keepOpen) lockModal();
+    else { netModal = null; closeModal(); if (m.decider !== "all") emit("modalClose"); }
+    m.resolve(v);
+  }
+  /** after a local dialog (rules, tile info) closes, bring back the game dialog it covered */
+  function restoreNetModal() {
+    if (isHost() && netModal && !netModal.answered) showNetModal();
+    else if (isGuest() && guestModalMsg && guestMid === guestModalMsg.mid) showGuestModal(guestModalMsg);
+  }
+  function endModal() {
+    if (isHost()) { netModal = null; emit("modalClose"); }
+    closeModal();
+  }
+  function revealQuiz(k, c) {
+    $("#modalBody").querySelectorAll("[data-choice]").forEach(b => {
+      b.disabled = true;
+      if (Number(b.dataset.choice) === c) b.classList.add("right");
+      else if (Number(b.dataset.choice) === k) b.classList.add("wrong");
+    });
   }
   function alertModal(title, html, ok = "Continue") {
     return modal({ body: (title ? `<h2>${esc(title)}</h2>` : "") + html, buttons: [{ label: ok, value: true }] });
   }
-  function toast(msg) {
+  /** a dialog only for this screen (rules, tile info), never sent to other players */
+  function localAlert(html, ok) {
+    return modal({ body: html, buttons: [{ label: ok, value: true }], local: true });
+  }
+  function toast(msg, everyone) {
+    if (everyone) emit("toast", { msg });
     const el = document.createElement("div");
     el.className = "toast";
     el.textContent = msg;
@@ -686,7 +779,7 @@ export function boot() {
     else if (t.type === "noli") html = `<h2>📖 NOLI card</h2><p>Draw a card inspired by <i>Noli Me Tangere</i> (1887).</p>`;
     else if (t.type === "fili") html = `<h2>🗡️ FILI card</h2><p>Draw a card inspired by <i>El Filibusterismo</i> (1891).</p>`;
     else html = `<h2>${t.icon} ${esc(t.name)}</h2><p>${esc(t.note)}</p>`;
-    modal({ body: html, buttons: [{ label: "Close", value: 0, cls: "btn-outline" }] });
+    modal({ body: html, buttons: [{ label: "Close", value: 0, cls: "btn-outline" }], local: true });
   }
 
   function rulesHtml() {
@@ -719,7 +812,11 @@ export function boot() {
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
     window.scrollTo(0, 0);
     if (id === "setup") renderSetup();
-    if (id === "landing") $("#resumeBtn").classList.toggle("hidden", !hasResumable());
+    if (id === "landing") {
+      const s = loadSave();
+      $("#resumeBtn").classList.toggle("hidden", !hasResumable());
+      $("#resumeBtn").textContent = s && s.online ? `↻ Re-open online room ${s.online.code}` : "↻ Resume saved game";
+    }
   }
 
   function hasResumable() { const s = loadSave(); return !!(s && s.phase !== "over"); }
@@ -810,8 +907,8 @@ export function boot() {
         fn(...a);
       };
       board = await createBoard($("#gameBoard"), {
-        onRoll: guard(() => onRoll()),
-        onEnd: guard(() => onEndTurn()),
+        onRoll: guard(() => requestAct("roll")),
+        onEnd: guard(() => requestAct("end")),
         onTile: guard(i => showTileInfo(i)),
         onDeck: guard(kind => showTileInfo(TILES.findIndex(t => t.type === kind))),
       });
@@ -820,8 +917,207 @@ export function boot() {
     lastMoney = null;
     refresh();
     FX.startMusic();
+    if (isGuest()) return; // the host runs the turn flow and tells us what to show
     (G.phase === "roll" ? showSplash() : Promise.resolve()).then(startTurnPrompt);
   }
+
+  /* =========================================================
+     Online play. The host's browser runs the real game (everything above) and
+     mirrors it to the guests; guests send requests and draw what they are told.
+     ========================================================= */
+  function isHost() { return !!NET && NET.role === "host"; }
+  function isGuest() { return !!NET && NET.role === "guest"; }
+  /** can this screen act for player pi? Host may also act for players who went offline. */
+  function hostControls(pi) {
+    if (!NET) return true;
+    if (!isHost()) return NET.mySeat === pi;
+    const p = G.players[pi];
+    return !p || p.cid === NET.cid || !!p.offline;
+  }
+  function canAct() { return !G || hostControls(G.turn); }
+  function seatOfCid(c) { return G ? G.players.findIndex(p => p.cid === c) : -1; }
+
+  // portraits are big data URLs; send a short token instead and swap it back on arrival
+  function packHtml(html) {
+    CHARACTERS.forEach(c => { html = html.split(portraitUrl(c.id)).join("@char:" + c.id); });
+    return html;
+  }
+  function unpackHtml(html) { return html.replace(/@char:([a-z]+)/g, (m, id) => portraitUrl(id) || m); }
+
+  let stateJson = null, stateTimer = null;
+  function queueState() {
+    if (!isHost()) return;
+    stateJson = JSON.stringify({ t: "state", G: { ...G, log: G.log.slice(-60) }, busy });
+    clearTimeout(stateTimer);
+    stateTimer = setTimeout(flushState, 100);
+  }
+  function flushState() {
+    clearTimeout(stateTimer);
+    if (stateJson && NET) NET.room.send(JSON.parse(stateJson));
+    stateJson = null;
+  }
+  /** host: tell every guest something happened (sent after any pending state, so order is kept) */
+  function emit(t, data = {}) {
+    if (!isHost()) return;
+    flushState();
+    NET.room.send({ t, ...data });
+  }
+
+  function requestAct(a, i) {
+    if (!G || G.phase === "over" || busy) return;
+    if (a === "roll" && G.phase !== "roll") return;
+    if (a === "end" && G.phase !== "end") return;
+    if (!canAct()) { if (NET) toast(`It's ${cur().name}'s turn.`); return; }
+    if (isGuest()) {
+      if (a === "build") {
+        const cost = upgradeCost(i);
+        if (cur().money < cost) { toast(`You need ${peso(cost)} to build here.`); return; }
+      }
+      NET.room.send({ t: "act", a, i });
+      busy = true; refresh(); // until the host answers with fresh state
+      return;
+    }
+    if (a === "roll") onRoll(); else if (a === "end") onEndTurn(); else if (a === "build") build(i);
+  }
+
+  function hostStart(room, players, maxRounds, hostCid) {
+    NET = { role: "host", room, cid: hostCid, mySeat: -1 };
+    newGame({ players, maxRounds });
+    G.players.forEach((p, i) => { p.cid = players[i].cid; });
+    G.online = { code: room.code };
+    NET.mySeat = seatOfCid(hostCid);
+    save();
+    emit("start");
+    enterGame();
+  }
+
+  function hostResume(room, hostCid) {
+    NET = { role: "host", room, cid: hostCid, mySeat: seatOfCid(hostCid) };
+    G.players.forEach(p => { if (p.cid && p.cid !== hostCid) p.offline = true; });
+    emit("start");
+    enterGame();
+    toast(`Room ${room.code} is open again. Players can rejoin with the same code.`);
+  }
+
+  function hostMessage(m) {
+    if (!G) return;
+    if (m.t === "hello") {
+      let seat = seatOfCid(m.cid);
+      // a player whose tab was closed comes back with a new id: match them by name to an offline seat
+      if (seat < 0) seat = G.players.findIndex(p => p.offline && p.name.toLowerCase() === String(m.name || "").trim().toLowerCase());
+      if (seat >= 0) {
+        const p = G.players[seat];
+        const was = p.offline;
+        p.cid = m.cid; p.offline = false;
+        if (was) toast(`${p.name} is back`);
+      }
+      refresh(); flushState();
+      if (netModal && !netModal.answered) {
+        NET.room.send({ t: "modal", to: m.cid, mid: netModal.mid, body: packHtml(netModal.body), buttons: netModal.buttons, decider: netModal.decider });
+        showNetModal();
+      }
+    } else if (m.t === "bye") {
+      const seat = seatOfCid(m.cid);
+      if (seat >= 0 && !G.players[seat].offline) {
+        G.players[seat].offline = true;
+        toast(`${G.players[seat].name} lost connection. You can play for them until they rejoin.`);
+        refresh();
+        if (netModal && netModal.decider === seat) showNetModal();
+      }
+    } else if (m.t === "act") {
+      if (seatOfCid(m.cid) !== G.turn) return;
+      if (m.a === "roll") onRoll();
+      else if (m.a === "end") onEndTurn();
+      else if (m.a === "build") build(Number(m.i));
+      refresh();
+    } else if (m.t === "answer") {
+      if (netModal && netModal.mid === m.mid && seatOfCid(m.cid) === netModal.decider) resolveNetModal(m.mid, m.value);
+    } else if (m.t === "_reconnected") {
+      refresh(); flushState();
+    }
+  }
+
+  /* ---- guest side ---- */
+  let guestQueue = Promise.resolve(), guestBacklog = 0, guestMid = null;
+  function guestStart(room, cid) {
+    NET = { role: "guest", room, cid, mySeat: -1 };
+    G = null;
+  }
+  function guestMessage(m) {
+    guestBacklog++;
+    guestQueue = guestQueue.then(() => guestApply(m, guestBacklog > 10)).catch(err => console.error(err)).finally(() => { guestBacklog--; });
+  }
+  let guestModalMsg = null;
+  function showGuestModal(m) {
+    const who = typeof m.decider === "number" ? G.players[m.decider] : null;
+    const mine = m.decider === "all" || m.decider === NET.mySeat;
+    openModal(unpackHtml(m.body), m.buttons, {
+      locked: !mine || m.answered,
+      waiting: mine ? "" : `⏳ Waiting for ${esc(who ? who.name : "the host")}…`,
+      onPick: v => {
+        if (m.decider === "all") { closeModal(); guestMid = null; return; }
+        m.answered = true;
+        lockModal();
+        NET.room.send({ t: "answer", mid: m.mid, value: v });
+      },
+    });
+  }
+  function setBanner(text) {
+    let b = $("#netBanner");
+    if (!text) { b && b.remove(); return; }
+    if (!b) { b = document.createElement("div"); b.id = "netBanner"; b.className = "net-banner"; document.body.appendChild(b); }
+    b.textContent = text;
+  }
+  async function guestApply(m, skipAnim) {
+    if (!isGuest()) return;
+    if (m.t === "_status") { setBanner(m.text); return; }
+    if (m.t === "hostGone") { setBanner("The host disconnected. Waiting for them to come back…"); return; }
+    setBanner(null);
+    if (m.t === "state") {
+      const first = !G;
+      G = m.G; busy = m.busy;
+      NET.mySeat = seatOfCid(NET.cid);
+      if (first || !$("#game").classList.contains("active")) await enterGame();
+      else refresh();
+      return;
+    }
+    if (!G || !board) return;
+    const anim = !skipAnim;
+    switch (m.t) {
+      case "dice": if (anim) { FX.sound.dice(); await board.rollDice(m.d[0], m.d[1]); } break;
+      case "hop": G.players[m.pi].pos = m.pos; if (anim) { FX.sound.step(); await board.hop(G, m.pi, m.pos, m.fast); } break;
+      case "teleport": G.players[m.pi].pos = m.pos; if (anim) await board.teleport(G, m.pi, m.pos); break;
+      case "cardFly": if (anim) await board.drawCardFly(m.kind); break;
+      case "stamp": if (anim) board.stamp(m.i); break;
+      case "highlight": if (anim) board.highlight(m.i); break;
+      case "confetti": if (anim) board.confetti(m.n); break;
+      case "bigConfetti": FX.confetti(5000, 260); break;
+      case "sfx": if (anim && FX.sound[m.s]) FX.sound[m.s](); break;
+      case "toast": toast(m.msg); break;
+      case "splash": if (anim) showSplash(); break;
+      case "modal": guestMid = m.mid; guestModalMsg = m; showGuestModal(m); break;
+      case "modalClose": if (guestMid !== null) { guestMid = null; closeModal(); } break;
+      case "quizReveal": revealQuiz(m.k, m.c); break;
+    }
+  }
+
+  function leaveOnline() {
+    if (!NET) return;
+    const wasGuest = isGuest();
+    online.left();
+    NET = null; netModal = null; busy = false; guestMid = null; guestModalMsg = null;
+    if (wasGuest) G = null;
+    setBanner(null);
+  }
+
+  const online = initOnline({
+    showScreen,
+    toast: msg => toast(msg),
+    hostStart,
+    hostResume,
+    guestStart,
+    gameMessage: m => (isHost() ? hostMessage(m) : guestMessage(m)),
+  });
 
   /* =========================================================
      Wiring
@@ -831,29 +1127,37 @@ export function boot() {
     if (a) {
       const act = a.dataset.action;
       if (act === "play") showScreen("setup");
+      else if (act === "online") online.open();
       else if (act === "home") showScreen("landing");
-      else if (act === "howto" || act === "rules") alertModal(null, rulesHtml(), "Got it");
-      else if (act === "about") alertModal(null, aboutHtml(), "Close");
+      else if (act === "howto" || act === "rules") localAlert(rulesHtml(), "Got it");
+      else if (act === "about") localAlert(aboutHtml(), "Close");
       else if (act === "start") startFromSetup();
       else if (act === "mute") { FX.setMuted(!FX.isMuted()); updateMute(); }
       else if (act === "music") { FX.setMusic(!FX.isMusicOn()); updateMute(); }
-      else if (act === "resume") { G = loadSave(); if (G) enterGame(); }
+      else if (act === "resume") {
+        const s = loadSave();
+        if (s && s.online) { G = s; online.resumeHost(s.online.code); }
+        else if (s) { G = s; enterGame(); }
+      }
       else if (act === "quit") {
-        const c = await modal({ body: `<h2>Leave the game?</h2><p>Your game is saved on this device. You can resume it from the home page.</p>`,
+        const text = isGuest() ? `<p>You can rejoin with room code <b>${esc(NET.room.code)}</b> while the host keeps the game open.</p>`
+          : isHost() ? `<p>This closes the room for everyone. The game is saved on this device: resume it from the home page and players can rejoin with code <b>${esc(NET.room.code)}</b>.</p>`
+          : `<p>Your game is saved on this device. You can resume it from the home page.</p>`;
+        const c = await modal({ body: `<h2>Leave the game?</h2>${text}`, local: true,
           buttons: [{ label: "Stay", value: false, cls: "btn-outline" }, { label: "Leave", value: true }] });
-        if (c) showScreen("landing");
+        if (c) { leaveOnline(); showScreen("landing"); }
       }
       return;
     }
     const b = e.target.closest("[data-build]");
-    if (b) build(Number(b.dataset.build));
+    if (b) requestAct("build", Number(b.dataset.build));
   });
   document.addEventListener("keydown", e => {
     if (!$("#modal").classList.contains("hidden") || !$("#splash").classList.contains("hidden")) return;
     if (!$("#game").classList.contains("active") || e.target.tagName === "INPUT") return;
     if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
-      if (G.phase === "roll") onRoll(); else if (G.phase === "end") onEndTurn();
+      if (G.phase === "roll") requestAct("roll"); else if (G.phase === "end") requestAct("end");
     }
   });
 
@@ -861,7 +1165,8 @@ export function boot() {
   updateMute();
   renderLandingChars();
   showScreen("landing");
+  online.openFromLink();
 
   // expose a tiny hook for automated testing
-  window.__rizalopoly = { get state() { return G; }, rentFor: i => rentFor(i) };
+  window.__rizalopoly = { get state() { return G; }, get net() { return NET && { role: NET.role, mySeat: NET.mySeat, code: NET.room.code }; }, rentFor: i => rentFor(i) };
 }

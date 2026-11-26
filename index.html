@@ -19,6 +19,7 @@
         <p class="lead">Follow José Rizal from Calamba to Berlin, Ghent, Dapitan and Bagumbayan. Roll the dice, buy the places that shaped his life and novels, draw NOLI and FILI cards, and answer history questions to become the wealthiest player.</p>
         <div class="hero-buttons">
           <button class="btn btn-maroon" data-action="play">▶ Play Now</button>
+          <button class="btn btn-gold" data-action="online">🌐 Play Online</button>
           <button class="btn btn-green" data-action="howto">How to Play</button>
           <button class="btn btn-outline" data-action="about">About the Game</button>
         </div>
@@ -53,7 +54,7 @@
     <div class="setup-card">
       <button class="btn btn-link back" data-action="home">← Back</button>
       <h2>New Game</h2>
-      <p class="muted">Everyone plays on this device and passes it around on their turn.</p>
+      <p class="muted">Everyone plays on this device and passes it around on their turn. To play on separate phones, go back and choose <b>Play Online</b>.</p>
 
       <div class="setup-row">
         <label>Players</label>
@@ -68,6 +69,16 @@
 
       <p class="error" id="setupError"></p>
       <button class="btn btn-maroon big" data-action="start">Start Game</button>
+    </div>
+  </main>
+
+  <!-- ============ ONLINE ============ -->
+  <main id="online" class="screen">
+    <div class="setup-card">
+      <button class="btn btn-link back" data-action="home">← Back</button>
+      <h2>Play Online</h2>
+      <p class="muted">Everyone plays on their own phone. One person hosts and shares a 4-letter room code.</p>
+      <div id="onlineBody"></div>
     </div>
   </main>
 
