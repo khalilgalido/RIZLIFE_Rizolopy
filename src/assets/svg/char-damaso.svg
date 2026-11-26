@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<defs><clipPath id="c-damaso"><circle cx="128" cy="128" r="128"/></clipPath></defs>
+<g clip-path="url(#c-damaso)"><rect width="256" height="256" fill="#3d2a2a"/><path d="M128 128 L317.2310192722789 110.9230756523779 L317.2310192722789 145.07692434762208Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L309.3617216454943 184.63855508204844 L296.29160959832035 216.19259684807184Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L273.8817459462839 249.73132793025744 L249.73132793025744 273.8817459462839Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L216.1925968480719 296.2916095983203 L184.6385550820484 309.3617216454943Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L145.07692434762214 317.2310192722789 L110.92307565237789 317.2310192722789Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L71.3614449179516 309.3617216454943 L39.80740315192817 296.29160959832035Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L6.268672069742564 273.8817459462839 L-17.8817459462839 249.73132793025746Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L-40.29160959832035 216.19259684807184 L-53.3617216454943 184.63855508204847Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L-61.2310192722789 145.07692434762208 L-61.2310192722789 110.92307565237795Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L-53.36172164549433 71.36144491795156 L-40.29160959832038 39.807403151928185Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L-17.881745946283928 6.268672069742564 L6.268672069742522 -17.8817459462839Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L39.80740315192806 -40.29160959832029 L71.36144491795143 -53.3617216454943Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L110.92307565237789 -61.2310192722789 L145.07692434762203 -61.2310192722789Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L184.6385550820485 -53.3617216454943 L216.1925968480719 -40.29160959832032Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L249.73132793025744 -17.881745946283928 L273.8817459462839 6.268672069742522Z" fill="#b8913a" opacity=".35"/><path d="M128 128 L296.2916095983203 39.80740315192804 L309.3617216454943 71.36144491795142Z" fill="#b8913a" opacity=".35"/>
+  <circle cx="128" cy="128" r="104" fill="none" stroke="#b8913a" stroke-width="3" opacity=".5"/>
+    <path d="M30 256 C30 196 70 176 128 176 C186 176 226 196 226 256Z" fill="#6b4a32" stroke="#2b1611" stroke-width="4"/>
+    <path d="M70 200 C84 168 108 160 128 172 C148 160 172 168 186 200 C160 190 96 190 70 200Z" fill="#5a3c28" stroke="#2b1611" stroke-width="4"/>
+    <path d="M128 200 v56" stroke="#2b1611" stroke-width="3" opacity=".5"/>
+    <path d="M110 168 h36 v28 h-36z" fill="#d39577"/>
+    <ellipse cx="128" cy="120" rx="46" ry="50" fill="#efb79c" stroke="#2b1611" stroke-width="4"/>
+    <ellipse cx="82" cy="124" rx="7" ry="11" fill="#efb79c" stroke="#2b1611" stroke-width="4"/>
+    <ellipse cx="174" cy="124" rx="7" ry="11" fill="#efb79c" stroke="#2b1611" stroke-width="4"/>
+    <path d="M84 110 C86 88 96 80 104 78 M172 110 C170 88 160 80 152 78" stroke="#8a8a8a" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <path d="M104 106 q9 -4 18 2" stroke="#2b1611" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M134 108 q9 -6 18 -2" stroke="#2b1611" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="113" cy="120" rx="5" ry="4.5" fill="#2b1611"/><ellipse cx="143" cy="120" rx="5" ry="4.5" fill="#2b1611"/>
+    <path d="M128 124 q-5 12 3 14" stroke="#2b1611" stroke-width="3" fill="none" opacity=".7"/>
+    <ellipse cx="100" cy="140" rx="10" ry="6" fill="#e0505a" opacity=".45"/>
+    <ellipse cx="156" cy="140" rx="10" ry="6" fill="#e0505a" opacity=".45"/>
+    <path d="M116 152 q12 -6 24 0" stroke="#2b1611" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M100 160 q28 22 56 0" stroke="#2b1611" stroke-width="3" fill="none" opacity=".4"/>
+    <g transform="translate(128 222)"><path d="M0 -14 v28 M-9 -4 h18" stroke="#b8913a" stroke-width="5" stroke-linecap="round"/></g></g></svg>
