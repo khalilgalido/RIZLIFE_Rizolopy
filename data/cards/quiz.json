@@ -1,7 +1,7 @@
 {
-  "_about": "Rizal Quiz deck, asked at Quiz Corner (tile 24). 'answer' is the index of the right choice. Reward amounts are a guess.",
+  "_about": "Rizal Quiz deck, asked at Quiz Corner (tile 24). 'answer' is the index of the right choice. A right answer pays a flat ₱100 (confirmed rule). 'difficulty' is only for picking questions.",
   "deck": "quiz",
-  "reward": { "easy": 50, "medium": 100, "hard": 150 },
+  "reward": 100,
   "questions": [
     { "id": "q01", "difficulty": "easy", "topic": "life", "question": "Where was José Rizal born?", "choices": ["Calamba, Laguna", "Biñan, Laguna", "Dapitan", "Manila"], "answer": 0 },
     { "id": "q02", "difficulty": "easy", "topic": "life", "question": "When was Rizal born?", "choices": ["19 June 1861", "30 December 1861", "12 June 1898", "19 June 1871"], "answer": 0 },

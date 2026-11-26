@@ -18,8 +18,11 @@ Tile names, order, colour groups, prices, the four corners, where the NOLI and F
 
 - Group names (the board only shows colours).
 - Rents, house costs, mortgage values, START salary (₱200) and starting money (₱1500).
-- What each corner does: Dapitan Exile works like jail, Café Rest like free parking, Quiz Corner asks a quiz question.
-- All card text, card effects and quiz rewards.
+- All card text and card effects.
+
+## Confirmed rules
+
+One device, 2 to 6 players. Dapitan Exile works as jail, Café Rest is a free space, a right quiz answer pays a flat ₱100, and the richest player after 20 rounds wins. Full rules: the Rizalopoly rules spec doc.
 
 ## Worth a second look
 

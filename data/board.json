@@ -3,7 +3,7 @@
   "guesses": [
     "Group ids and labels (only the colours are on the board).",
     "rent table: [base, 1 house, 2, 3, 4, hotel]; base is 10% of price.",
-    "houseCost, mortgage, START salary, starting money, corner rules.",
+    "houseCost, mortgage, START salary, starting money.",
     "Tiles with verifyNote: true have a historical note worth double-checking."
   ],
   "currency": "₱",
@@ -213,8 +213,8 @@
       "type": "corner",
       "name": "Dapitan Exile",
       "action": "exile",
-      "note": "Works like jail: a player sent here waits out turns (rule is a guess). Rizal was exiled to Dapitan from 1892 to 1896 after founding La Liga Filipina.",
-      "guess": true
+      "note": "Works like jail (confirmed rule). Rizal was exiled to Dapitan from 1892 to 1896 after founding La Liga Filipina.",
+      "guess": false
     },
     {
       "index": 9,
@@ -335,8 +335,8 @@
       "type": "corner",
       "name": "Café Rest",
       "action": "rest",
-      "note": "A free rest stop where nothing happens (rule is a guess, like free parking).",
-      "guess": true
+      "note": "A free space where nothing happens (confirmed rule).",
+      "guess": false
     },
     {
       "index": 17,
@@ -457,8 +457,8 @@
       "type": "corner",
       "name": "Quiz Corner",
       "action": "quiz",
-      "note": "Draw a quiz card. A right answer earns bonus Piso (amount is a guess).",
-      "guess": true
+      "note": "Answer a quiz question. A right answer pays ₱100 (confirmed rule).",
+      "guess": false
     },
     {
       "index": 25,
