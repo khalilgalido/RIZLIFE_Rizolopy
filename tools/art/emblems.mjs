@@ -1,4 +1,4 @@
-/* Original place, corner and card emblems for Rizalopoly: bold outlined shapes in the game palette.
+/* Original place, corner and card emblems for Rizolopy: bold outlined shapes in the game palette.
    Each one is keyed by the file name it is written to (src/assets/svg/<key>.svg). */
 
 const I = "#2b1611"; // ink

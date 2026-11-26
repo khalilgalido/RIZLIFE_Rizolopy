@@ -1,4 +1,4 @@
-/* Rizalopoly game data: board, characters, cards and quiz questions. */
+/* Rizolopy game data: board, characters, cards and quiz questions. */
 
 export const GROUPS = {
   brown:     { name: "Childhood",          color: "#7a4a24" },

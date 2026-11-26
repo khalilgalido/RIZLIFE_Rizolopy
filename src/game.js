@@ -1,4 +1,4 @@
-/* Rizalopoly: hot-seat game logic and UI. Plain browser JavaScript, no build step. */
+/* Rizolopy: hot-seat game logic and UI. Plain browser JavaScript, no build step. */
 import { GROUPS, TILES, EXILE_INDEX, CHARACTERS, NOLI_CARDS, FILI_CARDS, QUIZ, RULES } from "./data.js";
 import { FX } from "./fx.js";
 import { createBoard } from "./board.js";
@@ -787,8 +787,8 @@ export function boot() {
   }
 
   function aboutHtml() {
-    return `<h2>About Rizalopoly</h2>
-      <p>Rizalopoly is a Monopoly-style board game that follows the life of Dr. José Rizal (1861 to 1896), the national hero of the Philippines.</p>
+    return `<h2>About Rizolopy</h2>
+      <p>Rizolopy is a Monopoly-style board game that follows the life of Dr. José Rizal (1861 to 1896), the national hero of the Philippines.</p>
       <p>The board traces his journey: his childhood in Calamba and Biñan, his schooling in Manila, his studies and writing in Spain, France and Germany, the printing of <i>Noli Me Tangere</i> in Berlin and <i>El Filibusterismo</i> in Ghent, his exile in Dapitan, and his final days at Fort Santiago and Bagumbayan.</p>
       <p>Every place, card and quiz question carries a short piece of history, so you learn about Rizal while you play.</p>`;
   }

@@ -2,7 +2,7 @@
 
 | What | Where it's used | Licence |
 | --- | --- | --- |
-| Original Rizalopoly illustrations (portraits, place emblems, capiz/banig/baybayin board motifs) | `src/assets/svg/`, generated from `tools/art/`, plus `src/board.js` | Made for this project |
+| Original Rizolopy illustrations (portraits, place emblems, capiz/banig/baybayin board motifs) | `src/assets/svg/`, generated from `tools/art/`, plus `src/board.js` | Made for this project |
 | [Fluent Emoji 3D](https://github.com/microsoft/fluentui-emoji) by Microsoft, via `@lobehub/fluent-emoji-3d` | Fallback icons for UI symbols (dice, sound, etc.) in `src/assets/art/` | MIT |
 | [Phaser 3](https://phaser.io) | Board, dice and token rendering | MIT |
 | [GSAP](https://gsap.com) | Menu, splash and dialog animation | GSAP Standard License (free) |

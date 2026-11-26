@@ -1,4 +1,4 @@
-# Rizalopoly
+# Rizolopy
 
 A Monopoly-style Philippine history board game that follows the life of José Rizal, from Calamba to Bagumbayan. 2 to 6 players share one device (hot seat).
 

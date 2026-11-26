@@ -1,4 +1,4 @@
-/* Rizalopoly effects: sound (Howler with synth fallback), music, confetti, floating money text. */
+/* Rizolopy effects: sound (Howler with synth fallback), music, confetti, floating money text. */
 import { Howl, Howler } from "howler";
 
 /* Drop audio files named after a sound (dice.mp3, coin.ogg, music.mp3 ...) into src/assets/audio

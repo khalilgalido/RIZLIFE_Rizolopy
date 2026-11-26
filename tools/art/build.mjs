@@ -1,4 +1,4 @@
-/* Writes the original Rizalopoly artwork to src/assets/svg/ (run with `npm run art`). */
+/* Writes the original Rizolopy artwork to src/assets/svg/ (run with `npm run art`). */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
