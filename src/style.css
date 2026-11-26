@@ -67,7 +67,7 @@ button { font: inherit; cursor: pointer; }
 }
 .eyebrow { color: var(--gold); letter-spacing: .12em; text-transform: uppercase; font-weight: 900; font-size: .9rem; margin: 0 0 .6rem; }
 .logo {
-  font-size: clamp(3rem, 7.4vw, 6.4rem);
+  font-size: clamp(3rem, 6.3vw, 6rem);
   color: var(--maroon);
   letter-spacing: .02em;
   line-height: 1;
@@ -329,7 +329,7 @@ button { font: inherit; cursor: pointer; }
 }
 
 /* board frame: lacquered maroon with gold inlay */
-#gameBoard, #previewBoard {
+#previewBoard {
   border: 1.4cqw solid var(--maroon);
   outline: none;
   border-radius: 1cqw;
@@ -339,7 +339,6 @@ button { font: inherit; cursor: pointer; }
     0 2cqw 4cqw rgba(60,25,5,.45),
     0 .4cqw 0 .4cqw #3b0b16;
 }
-#gameBoard { overflow: visible; }
 .tile { box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); transition: transform .15s, box-shadow .15s, filter .15s; }
 .tile:hover { transform: translateY(-.3cqw); z-index: 2; box-shadow: 0 .6cqw 1.2cqw rgba(0,0,0,.25); }
 .tile .band { box-shadow: inset 0 -.3cqw 0 rgba(0,0,0,.15), inset 0 .3cqw 0 rgba(255,255,255,.25); }
@@ -561,3 +560,18 @@ button { font: inherit; cursor: pointer; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 body, h1, h2, h3, h4, .p-money, .tc-name, .splash-name, .dice-sum { font-variant-numeric: lining-nums; }
+
+/* ---------- Phaser board + 3D artwork ---------- */
+.phaser-board { width: 100%; aspect-ratio: 1 / 1; position: relative; }
+.phaser-board canvas { display: block; filter: drop-shadow(0 18px 30px rgba(60,25,5,.35)); }
+img.emo { height: 1.15em; width: auto; vertical-align: -0.22em; display: inline-block; }
+.avatar img.emo { height: 1.1em; vertical-align: middle; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+.tile img.emo { height: 1.25em; }
+#musicBtn.off { opacity: .45; text-decoration: line-through; }
+.side-head { flex-wrap: wrap; }
+.side-head > div { display: flex; gap: 4px; flex-wrap: wrap; }
+.side-head .btn-small { padding: .3em .6em; font-size: .8rem; }
+.game-board-wrap { max-width: calc(100vh - 24px); }
+.phaser-board { overflow: hidden; min-width: 0; }
+.game-board-wrap { min-width: 0; }
+@media (max-width: 1000px) { .game-layout { grid-template-columns: minmax(0, 1fr); } }

@@ -1,6 +1,6 @@
 /* Rizalopoly game data: board, characters, cards and quiz questions. */
 
-const GROUPS = {
+export const GROUPS = {
   brown:     { name: "Childhood",          color: "#7a4a24" },
   lightblue: { name: "Manila Schooling",   color: "#7fc3e3" },
   pink:      { name: "Spain",              color: "#e78fb8" },
@@ -12,7 +12,7 @@ const GROUPS = {
 };
 
 /* 32 tiles, counter-clockwise from START (bottom-right corner). */
-const TILES = [
+export const TILES = [
   { type: "start",  name: "START", icon: "🚩", note: "Collect ₱200 each time you pass." },
   { type: "property", name: "Calamba", icon: "🏠", price: 60, group: "brown",
     note: "José Rizal was born here on June 19, 1861, the seventh of eleven children of Francisco Mercado and Teodora Alonso." },
@@ -69,9 +69,9 @@ const TILES = [
     note: "Rizal was executed here on December 30, 1896. The site is now Rizal Park (Luneta)." },
 ];
 
-const EXILE_INDEX = TILES.findIndex(t => t.type === "exile");
+export const EXILE_INDEX = TILES.findIndex(t => t.type === "exile");
 
-const CHARACTERS = [
+export const CHARACTERS = [
   { id: "rizal",     name: "José Rizal",         kind: "Historical Figure", icon: "🎓", color: "#6e1a2c",
     blurb: "Physician, writer and national hero from Calamba, Laguna." },
   { id: "josephine", name: "Josephine Bracken",  kind: "Historical Figure", icon: "🌹", color: "#1e4d3a",
@@ -92,7 +92,7 @@ const CHARACTERS = [
 
 /* Card effects: money (+/-), moveTo (tile index, collects START bonus if passing),
    moveBy (steps), exile, freeExit (get-out-of-exile), payEach / collectEach. */
-const NOLI_CARDS = [
+export const NOLI_CARDS = [
   { text: "Maximo Viola lends you money to print your novel.", fact: "Viola's loan paid for the first 2,000 copies of the Noli in 1887.", money: 150 },
   { text: "Padre Damaso denounces you from the pulpit. Pay a fine.", fact: "Padre Damaso is the Noli's arrogant friar and Maria Clara's real father.", money: -100 },
   { text: "Kapitan Tiago throws a grand dinner. Collect ₱20 from every player.", fact: "The Noli opens with a dinner party at Kapitan Tiago's house in Binondo.", collectEach: 20 },
@@ -103,7 +103,7 @@ const NOLI_CARDS = [
   { text: "Return home to Calamba. Advance to Calamba.", fact: "Rizal returned to the Philippines in August 1887 after the Noli was published.", moveTo: 1 },
 ];
 
-const FILI_CARDS = [
+export const FILI_CARDS = [
   { text: "Valentin Ventura funds your printing. Collect ₱200.", fact: "Ventura's help let El Filibusterismo be printed in Ghent in 1891.", money: 200 },
   { text: "Simoun's jewels dazzle the city. Collect ₱100.", fact: "Simoun, the rich jeweller, is Crisostomo Ibarra in disguise.", money: 100 },
   { text: "Your lamp at the wedding feast is discovered. Pay ₱150.", fact: "Simoun's lamp bomb at Paulita's wedding is foiled by Isagani.", money: -150 },
@@ -114,7 +114,7 @@ const FILI_CARDS = [
   { text: "Arrested as a suspected subversive. Go to Dapitan Exile.", fact: "Rizal was deported to Dapitan in July 1892, days after founding La Liga Filipina.", exile: true },
 ];
 
-const QUIZ = [
+export const QUIZ = [
   { q: "When was José Rizal born?", a: ["June 19, 1861", "December 30, 1861", "June 12, 1898", "August 26, 1860"], c: 0 },
   { q: "Who were Rizal's parents?", a: ["Francisco Mercado and Teodora Alonso", "Paciano Mercado and Saturnina Rizal", "Juan Luna and Narcisa Rizal", "Andres Bonifacio and Gregoria de Jesus"], c: 0 },
   { q: "In which city was Noli Me Tangere first printed?", a: ["Berlin", "Madrid", "Ghent", "Hong Kong"], c: 0 },
@@ -139,7 +139,7 @@ const QUIZ = [
   { q: "What profession did Rizal practice in Hong Kong and Dapitan?", a: ["Ophthalmologist (eye doctor)", "Lawyer", "Architect", "Priest"], c: 0 },
 ];
 
-const RULES = {
+export const RULES = {
   startMoney: 1500,
   passStart: 200,
   quizReward: 100,

@@ -1,30 +1,42 @@
 # Rizalopoly
 
-A Monopoly-style Philippine history board game that follows the life of José Rizal, from Calamba to Bagumbayan. Everyone plays on one device (hot seat), 2 to 6 players.
+A Monopoly-style Philippine history board game that follows the life of José Rizal, from Calamba to Bagumbayan. 2 to 6 players share one device (hot seat).
 
-## How to run
+## Play
 
-No install or build step. Open `index.html` in a web browser.
+- **Easiest:** download `index.html` from the latest build and double-click it. It is one self-contained file.
+- **Online:** every push to `main` deploys to GitHub Pages. Turn this on once in *Settings → Pages → Source: GitHub Actions*.
 
-To host it, turn on GitHub Pages for this repository (Settings → Pages → deploy from the `main` branch, root folder).
+## Develop
 
-## What's in it
+```bash
+npm install
+npm run dev      # local dev server with hot reload
+npm run build    # writes the single-file game to dist/index.html
+```
 
-- **Landing page**: title, Play Now / How to Play / About, board preview, feature cards and the 8 characters.
-- **Setup**: pick 2 to 6 players, names, characters and game length (10 rounds, 20 rounds or no limit).
-- **Board**: 32 tiles, 22 places in 8 colour groups (₱60 to ₱360), 3 NOLI and 3 FILI card tiles and 4 corners.
-- **Turns**: roll two dice, move, pass START for ₱200, doubles roll again, three doubles in a row sends you to Dapitan Exile.
-- **Buying and rent**: buy unowned places; others pay rent. Owning a whole group doubles rent and lets you build up to 3 landmarks 🏛 per place.
-- **NOLI / FILI cards**: 8 each, based on the two novels, each with a history fact.
-- **Quiz Corner**: a multiple choice Rizal question; a correct answer pays ₱100.
-- **Dapitan Exile**: pay ₱50, use Blumentritt's letter card, or roll doubles (max 3 tries).
-- **Winning**: last player standing, or highest net worth (cash + places + landmarks) when the round limit is reached.
-- The game autosaves in the browser, and "Resume saved game" appears on the home page.
+## Tech
+
+- **Phaser 3** draws the board, the tumbling dice, the hopping tokens, the card decks and the particle effects (`src/board.js`).
+- **GSAP** animates the turn splash, dialogs and menus.
+- **Howler.js** plays sounds. Drop your own files into `src/assets/audio/` (see the README there). Without them, the game uses built-in synthesized sounds and a small 3/4 background tune.
+- **Vite** builds everything into one HTML file.
+- The artwork is Microsoft's Fluent Emoji 3D (MIT). See `LICENSES.md`.
 
 ## Files
 
-- `index.html`: page structure (landing, setup, game, modal)
-- `css/style.css`: styles
-- `js/data.js`: board tiles, characters, cards, quiz questions and rule numbers (edit this to change content or balance)
-- `js/game.js`: game logic and UI
-- `js/fx.js`: 3D dice, sound effects (generated in the browser, no audio files), confetti and floating money text
+- `src/data.js`: board tiles, characters, cards, quiz questions and rule numbers. Edit this to change content or balance.
+- `src/game.js`: rules, turn flow, menus and dialogs.
+- `src/board.js`: the Phaser board scene.
+- `src/fx.js`: sound, music, confetti and floating money text.
+- `src/art.js`: loads the 3D artwork and swaps it in for emoji across the page.
+- `src/style.css`: page styles.
+
+## Rules (guessed where the design did not say)
+
+- Everyone starts with ₱1,500 and gets ₱200 for passing START. Rolling doubles lets you roll again.
+- Rent is 10% of a place's price, and doubles when you own its whole colour group. With a whole group you can build up to 3 landmarks per place, which multiply rent by ×5, ×12 and ×25.
+- NOLI and FILI cards (8 of each) and the Quiz Corner (a correct answer pays ₱100) each teach a Rizal fact.
+- Dapitan Exile: pay ₱50, use Blumentritt's letter, or roll doubles (3 tries).
+- If you can't pay, your landmarks and places are sold at half price. If that still isn't enough, you're bankrupt.
+- The game ends when one player is left, or at the round limit (10, 20 or none). The highest net worth wins.

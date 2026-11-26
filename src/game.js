@@ -1,9 +1,12 @@
 /* Rizalopoly: hot-seat game logic and UI. Plain browser JavaScript, no build step. */
-(function () {
-  "use strict";
+import { GROUPS, TILES, EXILE_INDEX, CHARACTERS, NOLI_CARDS, FILI_CARDS, QUIZ, RULES } from "./data.js";
+import { FX } from "./fx.js";
+import { createBoard } from "./board.js";
+import { gsap } from "gsap";
+
+export function boot() {
 
   const SAVE_KEY = "rizalopoly-save-v1";
-  const DICE_FACES = ["⚀", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
   const $ = (sel, root = document) => root.querySelector(sel);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const peso = n => "₱" + Math.round(n).toLocaleString("en-PH");
@@ -20,6 +23,7 @@
 
   let G = null;          // current game state
   let busy = false;      // true while an animation / modal flow is running
+  let board = null;      // Phaser board scene
 
   /* =========================================================
      Board rendering
@@ -54,66 +58,6 @@
       el.addEventListener("click", () => showTileInfo(i));
       boardEl.appendChild(el);
     });
-  }
-
-  function renderBoardState() {
-    const board = $("#gameBoard");
-    TILES.forEach((t, i) => {
-      const el = board.querySelector(`.tile[data-index="${i}"]`);
-      const own = G.owned[i];
-      el.classList.toggle("owned", !!own);
-      el.querySelector(".owner-flag")?.remove();
-      el.querySelector(".levels")?.remove();
-      if (own) {
-        const owner = G.players[own.owner];
-        el.style.setProperty("--owner-color", charById(owner.char).color);
-        el.insertAdjacentHTML("beforeend", `<span class="owner-flag" title="Owned by ${esc(owner.name)}">${charById(owner.char).icon}</span>`);
-        if (own.level > 0) el.insertAdjacentHTML("beforeend", `<span class="levels" title="Landmarks">${"🏛".repeat(own.level)}</span>`);
-      }
-    });
-    renderTokens();
-  }
-
-  /* Tokens live on one layer above the board so they can glide and hop between tiles. */
-  const COLS = [0.675, 1.85, 2.85, 3.85, 4.85, 5.85, 6.85, 7.85, 9.025]; // tile centres in board units (9.7 total)
-  function tileCenter(i) {
-    const { row, col } = gridPos(i);
-    return { x: COLS[col - 1] / 9.7 * 100, y: COLS[row - 1] / 9.7 * 100 };
-  }
-  const CLUSTER = [[0, 0], [-1, -1], [1, 1], [1, -1], [-1, 1], [0, 1.3]];
-  function renderTokens() {
-    const layer = $("#tokenLayer");
-    G.players.forEach((p, pi) => {
-      let el = layer.querySelector(`[data-player="${pi}"]`);
-      if (!el) {
-        const c = charById(p.char);
-        el = document.createElement("div");
-        el.className = "token";
-        el.dataset.player = pi;
-        el.style.setProperty("--c", c.color);
-        el.innerHTML = `<span>${c.icon}</span>`;
-        el.title = p.name;
-        layer.appendChild(el);
-      }
-      el.classList.toggle("gone", p.bankrupt);
-      el.classList.toggle("active", pi === G.turn && G.phase !== "over");
-      const same = G.players.map((q, qi) => qi).filter(qi => !G.players[qi].bankrupt && G.players[qi].pos === p.pos);
-      const k = same.indexOf(pi);
-      const off = same.length > 1 ? CLUSTER[k % CLUSTER.length] : [0, 0];
-      const { x, y } = tileCenter(p.pos);
-      el.style.left = `calc(${x}% + ${off[0] * 1.9}cqw)`;
-      el.style.top = `calc(${y}% + ${off[1] * 1.9}cqw)`;
-      el.style.zIndex = pi === G.turn ? 5 : 3;
-    });
-  }
-  function hopToken(pi) {
-    const el = $(`#tokenLayer [data-player="${pi}"] span`);
-    if (el && el.animate) el.animate([
-      { transform: "translateY(0) scale(1)" },
-      { transform: "translateY(-1.8cqw) scale(1.15)", offset: 0.45 },
-      { transform: "translateY(0) scale(.95)", offset: 0.85 },
-      { transform: "translateY(0) scale(1)" },
-    ], { duration: 220, easing: "ease-out" });
   }
 
   /* =========================================================
@@ -247,14 +191,8 @@
     const d1 = 1 + Math.floor(Math.random() * 6);
     const d2 = 1 + Math.floor(Math.random() * 6);
     FX.sound.dice();
-    FX.showDice($("#dice"), [d1, d2], true);
-    await sleep(1000);
+    await board.rollDice(d1, d2);
     G.lastDice = [d1, d2];
-    const sum = document.createElement("div");
-    sum.className = "dice-sum" + (d1 === d2 ? " doubles" : "");
-    sum.textContent = d1 === d2 ? `${d1 + d2} · Doubles!` : String(d1 + d2);
-    $(".dice-tray").appendChild(sum);
-    setTimeout(() => sum.remove(), 1400);
     return [d1, d2];
   }
 
@@ -318,8 +256,11 @@
   async function moveBy(pi, steps) {
     const p = G.players[pi];
     const dir = steps < 0 ? -1 : 1;
+    const fast = Math.abs(steps) > 12;
     for (let s = 0; s < Math.abs(steps); s++) {
       p.pos = (p.pos + dir + TILES.length) % TILES.length;
+      FX.sound.step();
+      await board.hop(G, pi, p.pos, fast);
       if (dir > 0 && p.pos === 0) {
         p.money += RULES.passStart;
         log(`${p.name} passed START and collected ${peso(RULES.passStart)}.`);
@@ -327,9 +268,6 @@
         FX.sound.coin();
       }
       refresh();
-      hopToken(pi);
-      FX.sound.step();
-      await sleep(230);
     }
   }
 
@@ -352,8 +290,8 @@
     p.exileTries = 0;
     G.doubles = 0;
     FX.sound.exile();
+    await board.teleport(G, pi, EXILE_INDEX);
     refresh();
-    await sleep(500);
     await alertModal("Exiled to Dapitan 🌴", `<p><b>${esc(p.name)}</b> is sent to Dapitan Exile and does not pass START.</p>
       <p class="fact">On their next turn they can pay ${peso(RULES.exileFee)} or try to roll doubles. After ${RULES.maxExileTurns} failed tries they must pay and move.</p>`);
   }
@@ -416,7 +354,7 @@
       if (ownsGroup(pi, t.group)) {
         log(`${p.name} now owns all of ${GROUPS[t.group].name}. Rent doubles and landmarks can be built.`);
         toast(`${p.name} completed the ${GROUPS[t.group].name} group!`);
-        FX.confetti(1800, 90);
+        board.confetti(120);
       }
     } else {
       G.msg = `${p.name} decided not to buy ${t.name}.`;
@@ -427,6 +365,7 @@
     const p = G.players[pi];
     const deck = kind === "noli" ? NOLI_CARDS : FILI_CARDS;
     const card = deck[drawFrom(kind + "Deck", deck)];
+    await board.drawCardFly(kind);
     FX.sound.card();
     await alertModal(null, `<div class="flip-scene"><div class="flip-card">
         <div class="flip-back ${kind}"><span>${kind === "noli" ? "📖" : "🗡️"}</span><b>${kind.toUpperCase()}</b></div>
@@ -479,7 +418,7 @@
     if (correct) {
       p.money += RULES.quizReward;
       log(`${p.name} answered the quiz correctly and earned ${peso(RULES.quizReward)}.`);
-      FX.confetti(1500, 70);
+      board.confetti(90);
       G.msg = `Correct! ${p.name} earns ${peso(RULES.quizReward)}.`;
     } else {
       log(`${p.name} missed the quiz question.`);
@@ -550,6 +489,7 @@
     log(`🏆 ${winner.name} wins!`);
     FX.sound.fanfare();
     FX.confetti(5000, 260);
+    board.confetti(240);
     G.msg = `🏆 ${winner.name} wins!`;
     save(); refresh();
     showWinner(reason, ranking);
@@ -593,23 +533,10 @@
   /* =========================================================
      Rendering: sidebar, dice, center
      ========================================================= */
-  function renderDice() {
-    FX.buildDice($("#dice"));
-    FX.showDice($("#dice"), G.lastDice, false);
-  }
-
   function refresh() {
     if (!G) return;
-    renderBoardState();
     const p = cur();
-    const c = charById(p.char);
-    $("#turnBanner").innerHTML = G.phase === "over" ? `<div class="tc-text"><div class="tc-name">Game over</div></div>`
-      : `<div class="avatar" style="background:${c.color}">${c.icon}</div>
-         <div class="tc-text"><div class="tc-name">${esc(p.name)}</div><div class="tc-sub">${esc(c.name)} · ${peso(p.money)}</div></div>`;
-    $("#turnBanner").style.setProperty("--c", c.color);
-    $("#turnMsg").textContent = G.msg || "";
-    $("#rollBtn").disabled = busy || G.phase !== "roll";
-    $("#endBtn").disabled = busy || G.phase !== "end";
+    if (board) board.sync(G, { busy, msg: G.msg });
     $("#roundInfo").textContent = G.maxRounds ? `Round ${G.round} of ${G.maxRounds}` : `Round ${G.round}`;
 
     $("#playerList").innerHTML = G.players.map((pl, i) => {
@@ -628,7 +555,10 @@
     if (lastMoney) {
       G.players.forEach((pl, i) => {
         const d = pl.money - (lastMoney[i] ?? pl.money);
-        if (d !== 0) FX.floatText($(`[data-prow="${i}"] .p-money`), (d > 0 ? "+" : "−") + peso(Math.abs(d)), d > 0);
+        if (d !== 0) {
+          FX.floatText($(`[data-prow="${i}"] .p-money`), (d > 0 ? "+" : "−") + peso(Math.abs(d)), d > 0);
+          if (board && !pl.bankrupt) board.floatAtTile(pl.pos, (d > 0 ? "+" : "−") + peso(Math.abs(d)), d > 0);
+        }
       });
     }
     lastMoney = G.players.map(pl => pl.money);
@@ -649,13 +579,12 @@
 
   let lastMoney = null;
 
-  function stampTile(i) {
-    const el = $(`#gameBoard .tile[data-index="${i}"]`);
-    if (!el) return;
-    el.classList.remove("stamp"); void el.offsetWidth; el.classList.add("stamp");
-  }
+  function stampTile(i) { board.stamp(i); }
 
-  function updateMute() { $("#muteBtn").textContent = FX.isMuted() ? "🔇" : "🔊"; }
+  function updateMute() {
+    $("#muteBtn").textContent = FX.isMuted() ? "🔇" : "🔊";
+    $("#musicBtn").classList.toggle("off", !FX.isMusicOn());
+  }
 
   function showSplash() {
     const p = cur();
@@ -670,20 +599,24 @@
       <div class="splash-hint">${p.inExile ? "🌴 You are in Dapitan Exile" : "Pass the device · tap to start your turn"}</div></div>`;
     sp.classList.remove("hidden");
     FX.sound.turn();
+    const tl = gsap.timeline();
+    tl.fromTo(sp, { opacity: 0 }, { opacity: 1, duration: 0.25 })
+      .from(".splash-round", { y: -30, opacity: 0, duration: 0.35 }, 0.05)
+      .from(".splash-avatar", { scale: 0, rotation: -180, duration: 0.7, ease: "back.out(1.7)" }, 0.1)
+      .from(".splash-name", { y: 40, opacity: 0, duration: 0.45, ease: "power3.out" }, 0.35)
+      .from(".splash-char, .splash-hint", { y: 20, opacity: 0, duration: 0.4, stagger: 0.1 }, 0.5);
     return new Promise(resolve => {
       let done = false;
-      const close = () => { if (done) return; done = true; sp.classList.add("hidden"); resolve(); };
+      const close = () => {
+        if (done) return; done = true; lastOverlayClose = Date.now();
+        gsap.to(sp, { opacity: 0, duration: 0.25, onComplete: () => { sp.classList.add("hidden"); sp.style.opacity = ""; resolve(); } });
+      };
       sp.onclick = close;
-      setTimeout(close, 1800);
+      setTimeout(close, 2000);
     });
   }
 
-  function highlight(i) {
-    const el = $(`#gameBoard .tile[data-index="${i}"]`);
-    if (!el) return;
-    el.classList.add("highlight");
-    setTimeout(() => el.classList.remove("highlight"), 1500);
-  }
+  function highlight(i) { board.highlight(i); }
 
   /* =========================================================
      Modals and toasts
@@ -703,10 +636,13 @@
     });
     bw.classList.toggle("hidden", buttons.length === 0);
     $("#modal").classList.remove("hidden");
+    gsap.fromTo("#modal .modal", { scale: 0.85, y: 30, opacity: 0 }, { scale: 1, y: 0, opacity: 1, duration: 0.4, ease: "back.out(1.6)" });
+    gsap.fromTo("#modalBody > *", { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.3, stagger: 0.04, delay: 0.1 });
     const first = bw.querySelector("button:not(:disabled):last-child") || bw.querySelector("button:not(:disabled)");
     first && first.focus();
   }
-  function closeModal() { $("#modal").classList.add("hidden"); modalResolve = null; }
+  let lastOverlayClose = 0;
+  function closeModal() { $("#modal").classList.add("hidden"); modalResolve = null; lastOverlayClose = Date.now(); }
   function modal({ body, buttons }) {
     return new Promise(resolve => { openModal(body, buttons); modalResolve = resolve; });
   }
@@ -862,14 +798,27 @@
     enterGame();
   }
 
-  function enterGame() {
+  async function enterGame() {
     busy = false;
     showScreen("game");
-    buildBoard($("#gameBoard"), true);
-    $("#tokenLayer").innerHTML = "";
+    if (!board) {
+      // ignore canvas taps while a dialog is open or right after one closes (the same tap can reach the canvas)
+      const guard = fn => (...a) => {
+        if (!$("#modal").classList.contains("hidden") || !$("#splash").classList.contains("hidden")) return;
+        if (Date.now() - lastOverlayClose < 400) return;
+        fn(...a);
+      };
+      board = await createBoard($("#gameBoard"), {
+        onRoll: guard(() => onRoll()),
+        onEnd: guard(() => onEndTurn()),
+        onTile: guard(i => showTileInfo(i)),
+        onDeck: guard(kind => showTileInfo(TILES.findIndex(t => t.type === kind))),
+      });
+    }
+    board.reset();
     lastMoney = null;
-    renderDice();
     refresh();
+    FX.startMusic();
     (G.phase === "roll" ? showSplash() : Promise.resolve()).then(startTurnPrompt);
   }
 
@@ -886,6 +835,7 @@
       else if (act === "about") alertModal(null, aboutHtml(), "Close");
       else if (act === "start") startFromSetup();
       else if (act === "mute") { FX.setMuted(!FX.isMuted()); updateMute(); }
+      else if (act === "music") { FX.setMusic(!FX.isMusicOn()); updateMute(); }
       else if (act === "resume") { G = loadSave(); if (G) enterGame(); }
       else if (act === "quit") {
         const c = await modal({ body: `<h2>Leave the game?</h2><p>Your game is saved on this device. You can resume it from the home page.</p>`,
@@ -897,10 +847,8 @@
     const b = e.target.closest("[data-build]");
     if (b) build(Number(b.dataset.build));
   });
-  $("#rollBtn").addEventListener("click", onRoll);
-  $("#endBtn").addEventListener("click", onEndTurn);
   document.addEventListener("keydown", e => {
-    if (!$("#modal").classList.contains("hidden")) return;
+    if (!$("#modal").classList.contains("hidden") || !$("#splash").classList.contains("hidden")) return;
     if (!$("#game").classList.contains("active") || e.target.tagName === "INPUT") return;
     if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
@@ -915,4 +863,4 @@
 
   // expose a tiny hook for automated testing
   window.__rizalopoly = { get state() { return G; }, rentFor: i => rentFor(i) };
-})();
+}

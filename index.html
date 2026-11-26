@@ -5,10 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rizalopoly</title>
   <meta name="description" content="Rizalopoly: a Philippine history board game following José Rizal's life.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
@@ -78,32 +74,14 @@
   <main id="game" class="screen">
     <div class="game-layout">
       <div class="game-board-wrap">
-        <div class="board" id="gameBoard">
-          <div class="board-center game-center">
-            <div class="center-title">
-              <div class="center-logo small">RIZALOPOLY</div>
-              <div class="center-sub small">Travel Through History</div>
-            </div>
-            <div class="center-mid">
-              <div class="deck deck-noli" title="NOLI cards"><div class="deck-card"><span>📖</span><b>NOLI</b><small>Me Tangere</small></div></div>
-              <div class="dice-tray"><div class="dice3d" id="dice"></div></div>
-              <div class="deck deck-fili" title="FILI cards"><div class="deck-card"><span>🗡️</span><b>FILI</b><small>Filibusterismo</small></div></div>
-            </div>
-            <div class="turn-card" id="turnBanner"></div>
-            <div class="turn-msg" id="turnMsg"></div>
-            <div class="turn-actions">
-              <button class="btn btn-maroon btn-glow" id="rollBtn">🎲 Roll Dice</button>
-              <button class="btn btn-green" id="endBtn">End Turn ➜</button>
-            </div>
-          </div>
-          <div class="token-layer" id="tokenLayer"></div>
-        </div>
+        <div id="gameBoard" class="phaser-board"></div>
       </div>
 
       <aside class="sidebar">
         <div class="side-head">
           <span class="round" id="roundInfo"></span>
           <div>
+            <button class="btn btn-small btn-outline" data-action="music" id="musicBtn" title="Music on or off">🎵</button>
             <button class="btn btn-small btn-outline" data-action="mute" id="muteBtn" title="Sound on or off">🔊</button>
             <button class="btn btn-small btn-outline" data-action="rules">Rules</button>
             <button class="btn btn-small btn-outline" data-action="quit">Quit</button>
@@ -129,8 +107,6 @@
   <!-- ============ TURN SPLASH ============ -->
   <div class="splash hidden" id="splash"></div>
 
-  <script src="js/data.js"></script>
-  <script src="js/fx.js"></script>
-  <script src="js/game.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

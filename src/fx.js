@@ -1,49 +1,16 @@
-/* Rizalopoly effects: 3D dice, sounds, confetti, floating money text. */
-const FX = (function () {
-  "use strict";
+/* Rizalopoly effects: sound (Howler with synth fallback), music, confetti, floating money text. */
+import { Howl, Howler } from "howler";
 
-  /* ---------------- 3D dice ---------------- */
-  // which pips are filled on a 3x3 grid for each value
-  const PIPS = {
-    1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
-  };
-  // rotation that brings each face to the front
-  const SHOW = { 1: [0, 0], 2: [0, -90], 3: [-90, 0], 4: [90, 0], 5: [0, 90], 6: [0, 180] };
-  const FACE_TF = {
-    1: "rotateY(0deg)", 2: "rotateY(90deg)", 3: "rotateX(90deg)",
-    4: "rotateX(-90deg)", 5: "rotateY(-90deg)", 6: "rotateY(180deg)",
-  };
-  const spins = [];
+/* Drop audio files named after a sound (dice.mp3, coin.ogg, music.mp3 ...) into src/assets/audio
+   and Howler plays them instead of the built-in synthesised sounds. */
+const audioFiles = import.meta.glob("./assets/audio/*.{mp3,ogg,wav,m4a}", { eager: true, query: "?url", import: "default" });
+const howls = {};
+for (const [path, url] of Object.entries(audioFiles)) {
+  const name = path.split("/").pop().replace(/\.[^.]+$/, "");
+  howls[name] = new Howl({ src: [url], volume: name === "music" ? 0.35 : 0.8, loop: name === "music", preload: true });
+}
 
-  function faceHtml(v) {
-    let pips = "";
-    for (let k = 0; k < 9; k++) pips += `<i class="${PIPS[v].includes(k) ? "on" : ""}"></i>`;
-    return `<div class="face f${v}" style="--tf:${FACE_TF[v]}">${pips}</div>`;
-  }
-
-  function buildDice(container) {
-    container.innerHTML = [0, 1].map(() =>
-      `<div class="die-wrap"><div class="cube">${[1, 2, 3, 4, 5, 6].map(faceHtml).join("")}</div><div class="die-shadow"></div></div>`).join("");
-    spins.length = 0;
-    spins.push({ x: 0, y: 0 }, { x: 0, y: 0 });
-  }
-
-  function setDie(cube, idx, value, spin) {
-    const s = spins[idx];
-    if (spin) { s.x += 2 + Math.floor(Math.random() * 2); s.y += 2 + Math.floor(Math.random() * 2); }
-    const [rx, ry] = SHOW[value];
-    cube.style.transform = `rotateX(${s.x * 360 + rx}deg) rotateY(${s.y * 360 + ry}deg)`;
-  }
-
-  function showDice(container, values, spin) {
-    const cubes = container.querySelectorAll(".cube");
-    cubes.forEach((c, i) => setDie(c, i, values[i], spin));
-    if (spin) {
-      container.querySelectorAll(".die-wrap").forEach(w => {
-        w.classList.remove("tossing"); void w.offsetWidth; w.classList.add("tossing");
-      });
-    }
-  }
+export const FX = (function () {
 
   /* ---------------- Sound (Web Audio, no files) ---------------- */
   let ctx = null;
@@ -85,7 +52,7 @@ const FX = (function () {
     src.start(t);
   }
 
-  const sound = {
+  const synth = {
     dice() { for (let k = 0; k < 7; k++) noise(0.05, { delay: k * 0.07 + Math.random() * 0.03, freq: 1500 + Math.random() * 1500, vol: 0.18 }); },
     step() { tone(520 + Math.random() * 60, 0.06, { type: "triangle", vol: 0.08 }); },
     coin() { tone(988, 0.08, { type: "square", vol: 0.06 }); tone(1319, 0.25, { type: "square", vol: 0.06, delay: 0.08 }); },
@@ -99,8 +66,70 @@ const FX = (function () {
     build() { tone(330, 0.08, { type: "square", vol: 0.07 }); tone(494, 0.08, { type: "square", vol: 0.07, delay: 0.09 }); tone(659, 0.2, { type: "square", vol: 0.07, delay: 0.18 }); },
   };
 
+  // every sound: use a Howler file when one exists, otherwise the synth version
+  const sound = {};
+  Object.keys(synth).forEach(name => {
+    sound[name] = () => {
+      if (muted) return;
+      if (howls[name]) howls[name].play(); else synth[name]();
+    };
+  });
+
+  /* ---------------- Background music ----------------
+     A gentle 3/4 loop in A minor (a nod to the kundiman), scheduled with Web Audio.
+     Replaced by src/assets/audio/music.* through Howler when that file exists. */
+  let musicOn = true;
+  try { musicOn = localStorage.getItem("rizalopoly-music") !== "0"; } catch (e) { /* ignore */ }
+  let musicTimer = null, musicGain = null, step = 0;
+  const N = f => 440 * Math.pow(2, (f - 69) / 12);
+  // chords (midi) per bar, melody (midi or 0) per beat
+  const BARS = [
+    { chord: [57, 60, 64], mel: [76, 74, 72] }, { chord: [53, 57, 60], mel: [72, 0, 69] },
+    { chord: [55, 59, 62], mel: [71, 72, 74] }, { chord: [52, 56, 59], mel: [76, 0, 0] },
+    { chord: [57, 60, 64], mel: [72, 74, 76] }, { chord: [50, 53, 57], mel: [77, 76, 74] },
+    { chord: [52, 56, 59], mel: [72, 71, 68] }, { chord: [57, 60, 64], mel: [69, 0, 0] },
+  ];
+  const BEAT = 0.62;
+  function pluck(a, freq, t, vol, dur) {
+    const o = a.createOscillator(), g = a.createGain(), f = a.createBiquadFilter();
+    o.type = "triangle"; o.frequency.value = freq;
+    f.type = "lowpass"; f.frequency.setValueAtTime(2400, t); f.frequency.exponentialRampToValueAtTime(500, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(f).connect(g).connect(musicGain); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function scheduleBar(a, t) {
+    const bar = BARS[step % BARS.length];
+    // guitar-like: bass on 1, chord on 2 and 3
+    pluck(a, N(bar.chord[0] - 12), t, 0.22, BEAT * 2.5);
+    [1, 2].forEach(b => bar.chord.forEach((n, k) => pluck(a, N(n), t + b * BEAT + k * 0.02, 0.06, BEAT * 1.2)));
+    bar.mel.forEach((n, b) => { if (n) pluck(a, N(n), t + b * BEAT, 0.1, BEAT * (bar.mel[b + 1] === 0 ? 2.6 : 1.1)); });
+    step++;
+  }
+  function startMusic() {
+    if (!musicOn || muted || musicTimer) return;
+    if (howls.music) { if (!howls.music.playing()) howls.music.play(); musicTimer = "howl"; return; }
+    const a = ac(); if (!a) return;
+    musicGain = a.createGain(); musicGain.gain.value = 0.5; musicGain.connect(a.destination);
+    let next = a.currentTime + 0.1;
+    const tick = () => { while (next < a.currentTime + 1.5) { scheduleBar(a, next); next += BEAT * 3; } };
+    tick();
+    musicTimer = setInterval(tick, 400);
+  }
+  function stopMusic() {
+    if (musicTimer === "howl") howls.music.stop();
+    else if (musicTimer) { clearInterval(musicTimer); if (musicGain) { musicGain.gain.setTargetAtTime(0, ctx.currentTime, 0.2); } }
+    musicTimer = null;
+  }
+  function setMusic(on) {
+    musicOn = on;
+    try { localStorage.setItem("rizalopoly-music", on ? "1" : "0"); } catch (e) { /* ignore */ }
+    if (on) startMusic(); else stopMusic();
+  }
+
   function setMuted(m) {
     muted = m;
+    Howler.mute(m);
+    if (m) stopMusic(); else startMusic();
     try { localStorage.setItem("rizalopoly-muted", m ? "1" : "0"); } catch (e) { /* ignore */ }
   }
 
@@ -149,5 +178,5 @@ const FX = (function () {
     setTimeout(() => el.remove(), 1600);
   }
 
-  return { buildDice, showDice, sound, setMuted, isMuted: () => muted, confetti, floatText };
+  return { sound, setMuted, isMuted: () => muted, setMusic, isMusicOn: () => musicOn, startMusic, confetti, floatText };
 })();
