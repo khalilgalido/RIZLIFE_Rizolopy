@@ -876,7 +876,7 @@ export function boot() {
       if (act === "play") {
         if (tutorialSeen()) { showScreen("setup"); return; }
         markSeen();
-        const c = await modal({ body: `<h2>🎓 New to Rizalopoly?</h2><p>A two-minute practice game walks you through rolling, buying, rent, NOLI and FILI cards, Quiz Corner and Dapitan Exile. You can replay it any time from the home page.</p>`,
+        const c = await modal({ body: `<h2>🎓 New to Rizolopy?</h2><p>A two-minute practice game walks you through rolling, buying, rent, NOLI and FILI cards, Quiz Corner and Dapitan Exile. You can replay it any time from the home page.</p>`,
           buttons: [{ label: "Skip, set up a game", value: false, cls: "btn-outline" }, { label: "Play the tutorial", value: true }] });
         if (c) startTutorial(); else showScreen("setup");
       }

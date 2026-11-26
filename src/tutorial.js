@@ -1,4 +1,4 @@
-/* Rizalopoly interactive tutorial.
+/* Rizolopy interactive tutorial.
    A scripted two-player practice game: the dice, the cards and the quiz question are
    fixed so every new player sees buying, rent, NOLI and FILI cards, Dapitan Exile and
    Quiz Corner in about two minutes. The game itself runs normally; this module only
@@ -33,7 +33,7 @@ const peso = n => "₱" + Math.round(n).toLocaleString("en-PH");
    silent: no bubble, just wait for the event */
 const STEPS = [
   { silent: true, wait: "turnStart" },
-  { title: "Welcome to Rizalopoly!", text: `This short practice game shows you how to play. You control both players, just like passing one phone around a group. You can skip it at any time.` },
+  { title: "Welcome to Rizolopy!", text: `This short practice game shows you how to play. You control both players, just like passing one phone around a group. You can skip it at any time.` },
   { target: "#playerList", title: "Two players", text: `Here are <b>You</b> (José Rizal) and your <b>Friend</b> (Josephine Bracken). Everyone starts with <b>₱1,500</b>. The richest player at the end wins.` },
   { target: "roll", title: "Roll the dice", text: `Tap <b>Roll Dice</b> to start your turn.`, wait: "rolled", tap: true },
   { target: { tile: 4 }, title: "Move", text: d => `You rolled <b>${d.total}</b>. Your token hops ${d.total} spaces around the board, counter-clockwise from START.`, wait: "buyOffer" },
