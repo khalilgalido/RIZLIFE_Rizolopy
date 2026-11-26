@@ -370,7 +370,7 @@ class BoardScene extends Phaser.Scene {
   }
 
   /* ---------- state sync ---------- */
-  sync(G, { busy, msg }) {
+  sync(G, { busy, msg, canAct = true }) {
     const p = G.players[G.turn];
     const ch = charById(p.char);
     // plate
@@ -396,8 +396,8 @@ class BoardScene extends Phaser.Scene {
     }
 
     this.msg.setText(msg || "");
-    this.setButton(this.rollBtn, !busy && G.phase === "roll", true);
-    this.setButton(this.endBtn, !busy && G.phase === "end", false);
+    this.setButton(this.rollBtn, canAct && !busy && G.phase === "roll", true);
+    this.setButton(this.endBtn, canAct && !busy && G.phase === "end", false);
 
     // ownership
     TILES.forEach((t, i) => {
