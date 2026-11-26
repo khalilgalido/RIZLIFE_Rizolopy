@@ -41,3 +41,17 @@ npm run build    # writes the single-file game to dist/index.html
 - Dapitan Exile: pay ₱50, use Blumentritt's letter, or roll doubles (3 tries).
 - If you can't pay, your landmarks and places are sold at half price. If that still isn't enough, you're bankrupt.
 - The game ends when one player is left, or at the round limit (10, 20 or none). The highest net worth wins.
+
+
+
+## Play online
+Live at https://rizolopy.vercel.app
+
+Made by 
+Rico Albania
+Sheila Cheng
+Joshmar Clavero
+Khalil Galido
+Gwyneth Salud
+Nina Ramos
+for RIZLIFE.
