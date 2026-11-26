@@ -1,0 +1,28 @@
+{
+  "_about": "Rizal Quiz deck, asked at Quiz Corner (tile 24). 'answer' is the index of the right choice. Reward amounts are a guess.",
+  "deck": "quiz",
+  "reward": { "easy": 50, "medium": 100, "hard": 150 },
+  "questions": [
+    { "id": "q01", "difficulty": "easy", "topic": "life", "question": "Where was José Rizal born?", "choices": ["Calamba, Laguna", "Biñan, Laguna", "Dapitan", "Manila"], "answer": 0 },
+    { "id": "q02", "difficulty": "easy", "topic": "life", "question": "When was Rizal born?", "choices": ["19 June 1861", "30 December 1861", "12 June 1898", "19 June 1871"], "answer": 0 },
+    { "id": "q03", "difficulty": "easy", "topic": "life", "question": "Who was Rizal's mother?", "choices": ["Teodora Alonso", "Leonor Rivera", "Josephine Bracken", "Saturnina Rizal"], "answer": 0 },
+    { "id": "q04", "difficulty": "easy", "topic": "novels", "question": "What is Rizal's first novel?", "choices": ["Noli Me Tangere", "El Filibusterismo", "Mi Último Adiós", "Sucesos de las Islas Filipinas"], "answer": 0 },
+    { "id": "q05", "difficulty": "easy", "topic": "novels", "question": "Who is the hero of Noli Me Tangere?", "choices": ["Crisostomo Ibarra", "Elias", "Basilio", "Isagani"], "answer": 0 },
+    { "id": "q06", "difficulty": "easy", "topic": "final-days", "question": "Where was Rizal executed?", "choices": ["Bagumbayan", "Fort Santiago", "Intramuros", "Dapitan"], "answer": 0 },
+    { "id": "q07", "difficulty": "medium", "topic": "travels", "question": "In which city was Noli Me Tangere printed?", "choices": ["Berlin", "Madrid", "Ghent", "London"], "answer": 0 },
+    { "id": "q08", "difficulty": "medium", "topic": "travels", "question": "In which city was El Filibusterismo printed?", "choices": ["Ghent", "Berlin", "Paris", "Barcelona"], "answer": 0 },
+    { "id": "q09", "difficulty": "medium", "topic": "travels", "question": "Who lent Rizal the money to print the Noli?", "choices": ["Maximo Viola", "Valentin Ventura", "Ferdinand Blumentritt", "Paciano Rizal"], "answer": 0 },
+    { "id": "q10", "difficulty": "medium", "topic": "schooling", "question": "Which school did Rizal attend from 1872 to 1877?", "choices": ["Ateneo Municipal de Manila", "University of Santo Tomas", "Colegio de San Juan de Letran", "Universidad Central de Madrid"], "answer": 0 },
+    { "id": "q11", "difficulty": "medium", "topic": "schooling", "question": "What did Rizal specialise in as a doctor?", "choices": ["Ophthalmology (eyes)", "Surgery", "Dentistry", "Paediatrics"], "answer": 0 },
+    { "id": "q12", "difficulty": "medium", "topic": "novels", "question": "Who is Simoun in El Filibusterismo?", "choices": ["Ibarra in disguise", "Elias in disguise", "Padre Damaso's son", "A Spanish governor"], "answer": 0 },
+    { "id": "q13", "difficulty": "medium", "topic": "life", "question": "Which organisation did Rizal found in July 1892, shortly before his exile?", "choices": ["La Liga Filipina", "Katipunan", "La Solidaridad", "Propaganda Movement"], "answer": 0 },
+    { "id": "q14", "difficulty": "medium", "topic": "life", "question": "Where was Rizal exiled from 1892 to 1896?", "choices": ["Dapitan", "Hong Kong", "Guam", "Palawan"], "answer": 0 },
+    { "id": "q15", "difficulty": "medium", "topic": "final-days", "question": "What poem did Rizal write before his execution?", "choices": ["Mi Último Adiós", "A la Juventud Filipina", "A las Flores de Heidelberg", "Mi Retiro"], "answer": 0 },
+    { "id": "q16", "difficulty": "hard", "topic": "travels", "question": "Which Austrian scholar did Rizal visit in Leitmeritz in 1887?", "choices": ["Ferdinand Blumentritt", "Otto Becker", "Louis de Wecker", "Adolf Meyer"], "answer": 0 },
+    { "id": "q17", "difficulty": "hard", "topic": "travels", "question": "Whose 1609 history of the Philippines did Rizal annotate in London?", "choices": ["Antonio de Morga", "Pedro Chirino", "Miguel de Legazpi", "Juan de Plasencia"], "answer": 0 },
+    { "id": "q18", "difficulty": "hard", "topic": "life", "question": "Who was Rizal's first teacher in Biñan?", "choices": ["Justiniano Aquino Cruz", "Lucas Padua", "Leon Monroy", "Francisco Sanchez"], "answer": 0 },
+    { "id": "q19", "difficulty": "hard", "topic": "life", "question": "With which Jesuit did Rizal build the relief map of Mindanao in Dapitan?", "choices": ["Fr. Francisco Sanchez", "Fr. Pablo Pastells", "Fr. Jose Villaclara", "Fr. Federico Faura"], "answer": 0 },
+    { "id": "q20", "difficulty": "hard", "topic": "final-days", "question": "On what date was Rizal executed?", "choices": ["30 December 1896", "19 June 1896", "26 August 1896", "1 January 1897"], "answer": 0 }
+  ],
+  "note": "Every correct answer is listed first. Shuffle 'choices' at play time and track the right one."
+}

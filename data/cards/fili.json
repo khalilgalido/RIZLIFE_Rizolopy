@@ -1,0 +1,18 @@
+{
+  "_about": "FILI deck (like Community Chest). Drawn on FILI tiles 6, 18 and 28. Every card is a guess: the screenshots show no card text. Each card carries an El Filibusterismo fact. Effect types are defined in noli.json.",
+  "deck": "fili",
+  "cards": [
+    { "id": "fili-01", "text": "Simoun the jeweler sells you a gem. Pay ₱100.", "effect": "pay", "amount": 100, "fact": "Simoun, a rich jeweler with dark glasses, is Ibarra in disguise, returned to take revenge." },
+    { "id": "fili-02", "text": "The steamer Tabo crawls up the Pasig. Move back 2 tiles.", "effect": "moveBy", "steps": -2, "fact": "El Filibusterismo opens on the slow, round steamer Tabo on the Pasig River, a symbol of the colonial government." },
+    { "id": "fili-03", "text": "Students win support for an academy of Spanish. Collect ₱100.", "effect": "collect", "amount": 100, "fact": "Students in the Fili campaign for an academy to teach Spanish, but the plan is stalled by the friars." },
+    { "id": "fili-04", "text": "Your book is printed with Valentin Ventura's help. Go to Ghent.", "effect": "moveTo", "target": 19, "fact": "El Filibusterismo was printed in Ghent in 1891. Valentin Ventura paid for the printing when Rizal ran out of funds." },
+    { "id": "fili-05", "text": "Seditious posters appear at the university. Go to Dapitan Exile.", "effect": "goToExile", "fact": "After anonymous posters appear, the students in the Fili are rounded up, Basilio among them." },
+    { "id": "fili-06", "text": "Isagani throws the lamp into the river. Keep this card to leave Dapitan Exile.", "effect": "freeFromExile", "fact": "Isagani grabs Simoun's bomb lamp at the wedding feast and throws it into the river, saving the guests." },
+    { "id": "fili-07", "text": "Kabesang Tales loses his land. Pay ₱50.", "effect": "pay", "amount": 50, "fact": "Kabesang Tales clears his land only to have friars claim it, and he becomes the bandit Matanglawin." },
+    { "id": "fili-08", "text": "Basilio graduates in medicine. Collect ₱150.", "effect": "collect", "amount": 150, "fact": "Basilio, Sisa's son, studies medicine with Capitan Tiago's support." },
+    { "id": "fili-09", "text": "A wedding feast in Binondo. Go to Fili: Binondo.", "effect": "moveTo", "target": 27, "fact": "Paulita Gomez and Juanito Pelaez's wedding feast is held in Capitan Tiago's former house, where Simoun sets his lamp." },
+    { "id": "fili-10", "text": "Father Florentino hears Simoun's last confession. Collect ₱20 from every player.", "effect": "collectFromEach", "amount": 20, "fact": "The Fili ends with Simoun dying at Father Florentino's house by the sea; the priest throws his treasure into the ocean." },
+    { "id": "fili-11", "text": "Juli seeks money to free her father. Pay each player ₱10.", "effect": "payEach", "amount": 10, "fact": "Juli works as a servant to raise ransom for her father, Kabesang Tales." },
+    { "id": "fili-12", "text": "Sail home to the Philippines. Go to Hong Kong.", "effect": "moveTo", "target": 20, "fact": "After the Fili came out, Rizal moved to Hong Kong in 1891 and worked as an eye doctor." }
+  ]
+}

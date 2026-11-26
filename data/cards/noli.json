@@ -1,0 +1,28 @@
+{
+  "_about": "NOLI deck (like Chance). Drawn on NOLI tiles 2, 11 and 25. Every card is a guess: the screenshots show no card text. Each card carries a Noli Me Tangere fact.",
+  "deck": "noli",
+  "effects": {
+    "collect": "Take 'amount' from the bank.",
+    "pay": "Pay 'amount' to the bank.",
+    "moveTo": "Move to tile 'target'. Collect the START salary if you pass START.",
+    "moveBy": "Move 'steps' tiles (negative is backwards).",
+    "goToExile": "Go straight to Dapitan Exile. Do not pass START.",
+    "freeFromExile": "Keep this card. Use it to leave Dapitan Exile.",
+    "collectFromEach": "Every other player pays you 'amount'.",
+    "payEach": "Pay every other player 'amount'."
+  },
+  "cards": [
+    { "id": "noli-01", "text": "Ibarra returns home from seven years in Europe. Advance to START.", "effect": "moveTo", "target": 0, "fact": "Noli Me Tangere opens with a dinner party at Capitan Tiago's house welcoming Crisostomo Ibarra home from Europe." },
+    { "id": "noli-02", "text": "Padre Damaso insults you at Capitan Tiago's dinner. Pay ₱50.", "effect": "pay", "amount": 50, "fact": "At the welcome dinner, Padre Damaso rudely belittles Ibarra and the education he got abroad." },
+    { "id": "noli-03", "text": "Elias saves you from the falling derrick. Collect ₱100.", "effect": "collect", "amount": 100, "fact": "At the cornerstone ceremony for Ibarra's school, a rigged derrick collapses, and Elias pulls Ibarra to safety." },
+    { "id": "noli-04", "text": "Lay the cornerstone of your school. Go to Ibarra's School.", "effect": "moveTo", "target": 29, "fact": "Ibarra plans to build a school in San Diego in memory of his father, Don Rafael." },
+    { "id": "noli-05", "text": "You are blamed for an uprising you did not plan. Go to Dapitan Exile.", "effect": "goToExile", "fact": "Ibarra is framed for a staged attack on the barracks and is arrested." },
+    { "id": "noli-06", "text": "Elias rows you to safety on the lake. Keep this card to leave Dapitan Exile.", "effect": "freeFromExile", "fact": "Elias helps Ibarra escape by hiding him in his banca on the Pasig and the lake." },
+    { "id": "noli-07", "text": "Sisa searches for her sons. Move back 3 tiles.", "effect": "moveBy", "steps": -3, "fact": "Sisa loses her mind searching for her sons Basilio and Crispin, one of the novel's saddest stories." },
+    { "id": "noli-08", "text": "The town fiesta of San Diego. Collect ₱20 from every player.", "effect": "collectFromEach", "amount": 20, "fact": "Several chapters of the Noli describe the lavish fiesta of San Diego." },
+    { "id": "noli-09", "text": "Visit the fictional town of the Noli. Go to Noli: San Diego.", "effect": "moveTo", "target": 26, "fact": "San Diego, Ibarra's hometown, is a fictional town by a lake, often linked to Calamba." },
+    { "id": "noli-10", "text": "Pilosopo Tasio writes for the future. Collect ₱50.", "effect": "collect", "amount": 50, "fact": "The old scholar Tasio writes in hieroglyphics, hoping future generations will read what he means." },
+    { "id": "noli-11", "text": "Capitan Tiago throws a party. Pay each player ₱10.", "effect": "payEach", "amount": 10, "fact": "Capitan Tiago, Maria Clara's father, is a rich man who keeps on good terms with the friars and officials." },
+    { "id": "noli-12", "text": "Your novel is printed with Maximo Viola's help. Go to Berlin.", "effect": "moveTo", "target": 14, "fact": "Rizal printed 2,000 copies of Noli Me Tangere in Berlin in 1887 using a loan from Maximo Viola." }
+  ]
+}

@@ -1,0 +1,567 @@
+{
+  "_about": "Rizalopoly board. Tile names, order, groups and prices come from the board screenshot. Fields marked in 'guesses' were not in the screenshot.",
+  "guesses": [
+    "Group ids and labels (only the colours are on the board).",
+    "rent table: [base, 1 house, 2, 3, 4, hotel]; base is 10% of price.",
+    "houseCost, mortgage, START salary, starting money, corner rules.",
+    "Tiles with verifyNote: true have a historical note worth double-checking."
+  ],
+  "currency": "₱",
+  "startSalary": 200,
+  "startingMoney": 1500,
+  "groups": [
+    {
+      "id": "childhood",
+      "label": "Childhood",
+      "color": "#7B4A26",
+      "houseCost": 50,
+      "tiles": [
+        1,
+        3
+      ]
+    },
+    {
+      "id": "schooling",
+      "label": "Schooling in Manila",
+      "color": "#7EC8E3",
+      "houseCost": 50,
+      "tiles": [
+        4,
+        5,
+        7
+      ]
+    },
+    {
+      "id": "spain-france",
+      "label": "Spain and France",
+      "color": "#E48DB8",
+      "houseCost": 100,
+      "tiles": [
+        9,
+        10,
+        12
+      ]
+    },
+    {
+      "id": "germany",
+      "label": "Germany and Bohemia",
+      "color": "#E8873A",
+      "houseCost": 100,
+      "tiles": [
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "id": "publishing",
+      "label": "Writing Abroad",
+      "color": "#C0392B",
+      "houseCost": 150,
+      "tiles": [
+        17,
+        19,
+        20
+      ]
+    },
+    {
+      "id": "dapitan",
+      "label": "Dapitan Years",
+      "color": "#F2C335",
+      "houseCost": 150,
+      "tiles": [
+        21,
+        22,
+        23
+      ]
+    },
+    {
+      "id": "novels",
+      "label": "The Novels",
+      "color": "#2E7D4F",
+      "houseCost": 200,
+      "tiles": [
+        26,
+        27,
+        29
+      ]
+    },
+    {
+      "id": "final-days",
+      "label": "Final Days",
+      "color": "#1F3A78",
+      "houseCost": 200,
+      "tiles": [
+        30,
+        31
+      ]
+    }
+  ],
+  "tiles": [
+    {
+      "index": 0,
+      "type": "corner",
+      "name": "START",
+      "action": "collect",
+      "note": "Collect a salary each time you pass. Amount is a guess (₱200).",
+      "guess": true
+    },
+    {
+      "index": 1,
+      "type": "property",
+      "name": "Calamba",
+      "group": "childhood",
+      "price": 60,
+      "icon": "🏠",
+      "rent": [
+        6,
+        30,
+        90,
+        240,
+        300,
+        360
+      ],
+      "mortgage": 30,
+      "note": "José Rizal was born in Calamba, Laguna on 19 June 1861, the seventh of eleven children of Francisco Mercado and Teodora Alonso."
+    },
+    {
+      "index": 2,
+      "type": "card",
+      "name": "NOLI",
+      "deck": "noli"
+    },
+    {
+      "index": 3,
+      "type": "property",
+      "name": "Biñan",
+      "group": "childhood",
+      "price": 70,
+      "icon": "✏️",
+      "rent": [
+        7,
+        35,
+        105,
+        280,
+        350,
+        420
+      ],
+      "mortgage": 35,
+      "note": "In 1870 Rizal was sent to Biñan, Laguna for formal schooling under Maestro Justiniano Aquino Cruz."
+    },
+    {
+      "index": 4,
+      "type": "property",
+      "name": "Ateneo",
+      "group": "schooling",
+      "price": 100,
+      "icon": "🎓",
+      "rent": [
+        10,
+        50,
+        150,
+        400,
+        500,
+        600
+      ],
+      "mortgage": 50,
+      "note": "Rizal studied at the Ateneo Municipal de Manila from 1872 to 1877 and earned his Bachiller en Artes with the highest marks."
+    },
+    {
+      "index": 5,
+      "type": "property",
+      "name": "UST",
+      "group": "schooling",
+      "price": 110,
+      "icon": "🏛️",
+      "rent": [
+        11,
+        55,
+        165,
+        440,
+        550,
+        660
+      ],
+      "mortgage": 55,
+      "note": "Rizal took philosophy and letters, then medicine, at the University of Santo Tomas from 1877 before leaving for Spain in 1882."
+    },
+    {
+      "index": 6,
+      "type": "card",
+      "name": "FILI",
+      "deck": "fili"
+    },
+    {
+      "index": 7,
+      "type": "property",
+      "name": "Intramuros",
+      "group": "schooling",
+      "price": 120,
+      "icon": "🏰",
+      "rent": [
+        12,
+        60,
+        180,
+        480,
+        600,
+        720
+      ],
+      "mortgage": 60,
+      "note": "The walled city of Manila, home in Rizal's day to both the Ateneo Municipal and the University of Santo Tomas."
+    },
+    {
+      "index": 8,
+      "type": "corner",
+      "name": "Dapitan Exile",
+      "action": "exile",
+      "note": "Works like jail: a player sent here waits out turns (rule is a guess). Rizal was exiled to Dapitan from 1892 to 1896 after founding La Liga Filipina.",
+      "guess": true
+    },
+    {
+      "index": 9,
+      "type": "property",
+      "name": "Madrid",
+      "group": "spain-france",
+      "price": 140,
+      "icon": "🌃",
+      "rent": [
+        14,
+        70,
+        210,
+        560,
+        700,
+        840
+      ],
+      "mortgage": 70,
+      "note": "At the Universidad Central de Madrid Rizal finished his licentiate in medicine in 1884 and in philosophy and letters in 1885."
+    },
+    {
+      "index": 10,
+      "type": "property",
+      "name": "Barcelona",
+      "group": "spain-france",
+      "price": 150,
+      "icon": "⛵",
+      "rent": [
+        15,
+        75,
+        225,
+        600,
+        750,
+        900
+      ],
+      "mortgage": 75,
+      "note": "Rizal's first stop in Spain in 1882. There he wrote the essay 'El Amor Patrio', his first article written abroad."
+    },
+    {
+      "index": 11,
+      "type": "card",
+      "name": "NOLI",
+      "deck": "noli"
+    },
+    {
+      "index": 12,
+      "type": "property",
+      "name": "Paris",
+      "group": "spain-france",
+      "price": 160,
+      "icon": "🗼",
+      "rent": [
+        16,
+        80,
+        240,
+        640,
+        800,
+        960
+      ],
+      "mortgage": 80,
+      "note": "In 1885 Rizal trained in ophthalmology in Paris under the noted eye surgeon Dr. Louis de Wecker."
+    },
+    {
+      "index": 13,
+      "type": "property",
+      "name": "Heidelberg",
+      "group": "germany",
+      "price": 180,
+      "icon": "🌸",
+      "rent": [
+        18,
+        90,
+        270,
+        720,
+        900,
+        1080
+      ],
+      "mortgage": 90,
+      "note": "In 1886 Rizal worked at the eye clinic of Dr. Otto Becker in Heidelberg and wrote the poem 'A las Flores de Heidelberg'."
+    },
+    {
+      "index": 14,
+      "type": "property",
+      "name": "Berlin",
+      "group": "germany",
+      "price": 190,
+      "icon": "🖊️",
+      "rent": [
+        19,
+        95,
+        285,
+        760,
+        950,
+        1140
+      ],
+      "mortgage": 95,
+      "note": "Noli Me Tangere was printed in Berlin in March 1887, paid for with a loan from his friend Maximo Viola."
+    },
+    {
+      "index": 15,
+      "type": "property",
+      "name": "Leitmeritz",
+      "group": "germany",
+      "price": 200,
+      "icon": "🤝",
+      "rent": [
+        20,
+        100,
+        300,
+        800,
+        1000,
+        1200
+      ],
+      "mortgage": 100,
+      "note": "In May 1887 Rizal visited Leitmeritz, Bohemia to meet Ferdinand Blumentritt in person, his closest friend and correspondent."
+    },
+    {
+      "index": 16,
+      "type": "corner",
+      "name": "Café Rest",
+      "action": "rest",
+      "note": "A free rest stop where nothing happens (rule is a guess, like free parking).",
+      "guess": true
+    },
+    {
+      "index": 17,
+      "type": "property",
+      "name": "London",
+      "group": "publishing",
+      "price": 220,
+      "icon": "🏙️",
+      "rent": [
+        22,
+        110,
+        330,
+        880,
+        1100,
+        1320
+      ],
+      "mortgage": 110,
+      "note": "In 1888 to 1889 Rizal copied and annotated Morga's 'Sucesos de las Islas Filipinas' at the British Museum in London."
+    },
+    {
+      "index": 18,
+      "type": "card",
+      "name": "FILI",
+      "deck": "fili"
+    },
+    {
+      "index": 19,
+      "type": "property",
+      "name": "Ghent",
+      "group": "publishing",
+      "price": 230,
+      "icon": "📕",
+      "rent": [
+        23,
+        115,
+        345,
+        920,
+        1150,
+        1380
+      ],
+      "mortgage": 115,
+      "note": "El Filibusterismo was printed in Ghent, Belgium in 1891. Valentin Ventura's help rescued the printing when Rizal ran out of money."
+    },
+    {
+      "index": 20,
+      "type": "property",
+      "name": "Hong Kong",
+      "group": "publishing",
+      "price": 240,
+      "icon": "⚓",
+      "rent": [
+        24,
+        120,
+        360,
+        960,
+        1200,
+        1440
+      ],
+      "mortgage": 120,
+      "note": "Rizal practised as an eye doctor in Hong Kong in 1891 to 1892 before returning to Manila."
+    },
+    {
+      "index": 21,
+      "type": "property",
+      "name": "Relief Map",
+      "group": "dapitan",
+      "price": 260,
+      "icon": "🗺️",
+      "rent": [
+        26,
+        130,
+        390,
+        1040,
+        1300,
+        1560
+      ],
+      "mortgage": 130,
+      "note": "In Dapitan Rizal and the Jesuit Fr. Francisco Sanchez built a relief map of Mindanao in the town plaza. It still stands."
+    },
+    {
+      "index": 22,
+      "type": "property",
+      "name": "Talisay Home",
+      "group": "dapitan",
+      "price": 270,
+      "icon": "🏡",
+      "rent": [
+        27,
+        135,
+        405,
+        1080,
+        1350,
+        1620
+      ],
+      "mortgage": 135,
+      "note": "Rizal's farm and home at Talisay, Dapitan, where he lived during his exile, later with Josephine Bracken."
+    },
+    {
+      "index": 23,
+      "type": "property",
+      "name": "Dapitan School",
+      "group": "dapitan",
+      "price": 280,
+      "icon": "🍎",
+      "rent": [
+        28,
+        140,
+        420,
+        1120,
+        1400,
+        1680
+      ],
+      "mortgage": 140,
+      "note": "Rizal ran a school for local boys in Dapitan, teaching them languages, sciences and practical skills."
+    },
+    {
+      "index": 24,
+      "type": "corner",
+      "name": "Quiz Corner",
+      "action": "quiz",
+      "note": "Draw a quiz card. A right answer earns bonus Piso (amount is a guess).",
+      "guess": true
+    },
+    {
+      "index": 25,
+      "type": "card",
+      "name": "NOLI",
+      "deck": "noli"
+    },
+    {
+      "index": 26,
+      "type": "property",
+      "name": "Noli: San Diego",
+      "group": "novels",
+      "price": 300,
+      "icon": "⛪",
+      "rent": [
+        30,
+        150,
+        450,
+        1200,
+        1500,
+        1800
+      ],
+      "mortgage": 150,
+      "note": "San Diego is the fictional town in Noli Me Tangere where Ibarra returns. It is often said to be modelled on Calamba."
+    },
+    {
+      "index": 27,
+      "type": "property",
+      "name": "Fili: Binondo",
+      "group": "novels",
+      "price": 310,
+      "icon": "💎",
+      "rent": [
+        31,
+        155,
+        465,
+        1240,
+        1550,
+        1860
+      ],
+      "mortgage": 155,
+      "note": "In El Filibusterismo, Simoun's lamp bomb is set at the wedding feast in Capitan Tiago's old house on Calle Anloague, Binondo.",
+      "verifyNote": true
+    },
+    {
+      "index": 28,
+      "type": "card",
+      "name": "FILI",
+      "deck": "fili"
+    },
+    {
+      "index": 29,
+      "type": "property",
+      "name": "Ibarra's School",
+      "group": "novels",
+      "price": 320,
+      "icon": "🏫",
+      "rent": [
+        32,
+        160,
+        480,
+        1280,
+        1600,
+        1920
+      ],
+      "mortgage": 160,
+      "note": "In the Noli, Ibarra plans a school for San Diego in memory of his father. Elias saves him from a plot at the cornerstone ceremony."
+    },
+    {
+      "index": 30,
+      "type": "property",
+      "name": "Fort Santiago",
+      "group": "final-days",
+      "price": 350,
+      "icon": "🏯",
+      "rent": [
+        35,
+        175,
+        525,
+        1400,
+        1750,
+        2100
+      ],
+      "mortgage": 175,
+      "note": "Rizal was held at Fort Santiago before his execution. 'Mi Último Adiós' was smuggled out of his cell hidden in an alcohol lamp."
+    },
+    {
+      "index": 31,
+      "type": "property",
+      "name": "Bagumbayan",
+      "group": "final-days",
+      "price": 360,
+      "icon": "🌅",
+      "rent": [
+        36,
+        180,
+        540,
+        1440,
+        1800,
+        2160
+      ],
+      "mortgage": 180,
+      "note": "Rizal was executed by firing squad at Bagumbayan on 30 December 1896. The site is now Rizal Park (Luneta)."
+    }
+  ]
+}
