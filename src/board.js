@@ -1,4 +1,4 @@
-/* Rizalopoly board, dice and tokens rendered with Phaser 3. */
+/* Rizolopy board, dice and tokens rendered with Phaser 3. */
 import Phaser from "phaser";
 import { TILES, GROUPS, CHARACTERS } from "./data.js";
 import { artKey, charKey, ALL_ART } from "./art.js";
@@ -175,7 +175,7 @@ class BoardScene extends Phaser.Scene {
     const banner = this.add.graphics().setDepth(5);
     banner.fillStyle(0xfff8ea, 0.82).fillRoundedRect(CX - 300, O + 170, 600, 150, 28);
     banner.lineStyle(3, COLORS.gold, 0.9).strokeRoundedRect(CX - 300, O + 170, 600, 150, 28);
-    this.logo = this.txt(CX, O + 225, "RIZALOPOLY", {
+    this.logo = this.txt(CX, O + 225, "RIZOLOPY", {
       fontFamily: SERIF, fontStyle: "900", fontSize: "72px", color: "#6e1a2c",
     }).setOrigin(0.5).setAngle(-3).setShadow(0, 4, "rgba(110,26,44,0.25)", 10).setDepth(6);
     this.txt(CX, O + 280, "Travel Through History", {

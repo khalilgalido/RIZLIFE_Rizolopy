@@ -1,4 +1,4 @@
-/* Original character portraits for Rizalopoly.
+/* Original character portraits for Rizolopy.
    Flat illustrated busts on a sun-ray medallion, drawn in the game palette.
    Run `npm run art` to regenerate the SVG files in src/assets/svg/. */
 
