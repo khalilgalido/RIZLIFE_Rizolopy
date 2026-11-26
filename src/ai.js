@@ -1,4 +1,4 @@
-/* Rizalopoly computer opponents.
+/* Rizolopy computer opponents.
  *
  * Pure decision functions: they read the game state and return a choice,
  * and never change the state themselves. game.js asks them what to do and
