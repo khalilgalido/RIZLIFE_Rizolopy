@@ -51,9 +51,6 @@
         el.classList.add("corner");
         el.innerHTML = `<div class="t-icon">${t.icon}</div><div class="t-name">${esc(t.name)}</div>`;
       }
-      if (interactive) {
-        el.insertAdjacentHTML("beforeend", `<div class="tokens"></div>`);
-      }
       el.addEventListener("click", () => showTileInfo(i));
       boardEl.appendChild(el);
     });
@@ -73,15 +70,50 @@
         el.insertAdjacentHTML("beforeend", `<span class="owner-flag" title="Owned by ${esc(owner.name)}">${charById(owner.char).icon}</span>`);
         if (own.level > 0) el.insertAdjacentHTML("beforeend", `<span class="levels" title="Landmarks">${"🏛".repeat(own.level)}</span>`);
       }
-      const tokens = el.querySelector(".tokens");
-      tokens.innerHTML = "";
-      G.players.forEach((p, pi) => {
-        if (p.bankrupt || p.pos !== i) return;
-        const c = charById(p.char);
-        tokens.insertAdjacentHTML("beforeend",
-          `<div class="token ${pi === G.turn ? "active" : ""}" style="background:${c.color}" title="${esc(p.name)}">${c.icon}</div>`);
-      });
     });
+    renderTokens();
+  }
+
+  /* Tokens live on one layer above the board so they can glide and hop between tiles. */
+  const COLS = [0.675, 1.85, 2.85, 3.85, 4.85, 5.85, 6.85, 7.85, 9.025]; // tile centres in board units (9.7 total)
+  function tileCenter(i) {
+    const { row, col } = gridPos(i);
+    return { x: COLS[col - 1] / 9.7 * 100, y: COLS[row - 1] / 9.7 * 100 };
+  }
+  const CLUSTER = [[0, 0], [-1, -1], [1, 1], [1, -1], [-1, 1], [0, 1.3]];
+  function renderTokens() {
+    const layer = $("#tokenLayer");
+    G.players.forEach((p, pi) => {
+      let el = layer.querySelector(`[data-player="${pi}"]`);
+      if (!el) {
+        const c = charById(p.char);
+        el = document.createElement("div");
+        el.className = "token";
+        el.dataset.player = pi;
+        el.style.setProperty("--c", c.color);
+        el.innerHTML = `<span>${c.icon}</span>`;
+        el.title = p.name;
+        layer.appendChild(el);
+      }
+      el.classList.toggle("gone", p.bankrupt);
+      el.classList.toggle("active", pi === G.turn && G.phase !== "over");
+      const same = G.players.map((q, qi) => qi).filter(qi => !G.players[qi].bankrupt && G.players[qi].pos === p.pos);
+      const k = same.indexOf(pi);
+      const off = same.length > 1 ? CLUSTER[k % CLUSTER.length] : [0, 0];
+      const { x, y } = tileCenter(p.pos);
+      el.style.left = `calc(${x}% + ${off[0] * 1.9}cqw)`;
+      el.style.top = `calc(${y}% + ${off[1] * 1.9}cqw)`;
+      el.style.zIndex = pi === G.turn ? 5 : 3;
+    });
+  }
+  function hopToken(pi) {
+    const el = $(`#tokenLayer [data-player="${pi}"] span`);
+    if (el && el.animate) el.animate([
+      { transform: "translateY(0) scale(1)" },
+      { transform: "translateY(-1.8cqw) scale(1.15)", offset: 0.45 },
+      { transform: "translateY(0) scale(.95)", offset: 0.85 },
+      { transform: "translateY(0) scale(1)" },
+    ], { duration: 220, easing: "ease-out" });
   }
 
   /* =========================================================
@@ -212,18 +244,17 @@
   }
 
   async function rollDice() {
-    const dice = document.querySelectorAll("#dice .die");
-    dice.forEach(d => d.classList.add("rolling"));
-    for (let k = 0; k < 8; k++) {
-      dice[0].textContent = DICE_FACES[1 + Math.floor(Math.random() * 6)];
-      dice[1].textContent = DICE_FACES[1 + Math.floor(Math.random() * 6)];
-      await sleep(60);
-    }
     const d1 = 1 + Math.floor(Math.random() * 6);
     const d2 = 1 + Math.floor(Math.random() * 6);
-    dice.forEach(d => d.classList.remove("rolling"));
+    FX.sound.dice();
+    FX.showDice($("#dice"), [d1, d2], true);
+    await sleep(1000);
     G.lastDice = [d1, d2];
-    renderDice();
+    const sum = document.createElement("div");
+    sum.className = "dice-sum" + (d1 === d2 ? " doubles" : "");
+    sum.textContent = d1 === d2 ? `${d1 + d2} · Doubles!` : String(d1 + d2);
+    $(".dice-tray").appendChild(sum);
+    setTimeout(() => sum.remove(), 1400);
     return [d1, d2];
   }
 
@@ -293,9 +324,12 @@
         p.money += RULES.passStart;
         log(`${p.name} passed START and collected ${peso(RULES.passStart)}.`);
         toast(`${p.name} collects ${peso(RULES.passStart)} for passing START`);
+        FX.sound.coin();
       }
       refresh();
-      await sleep(170);
+      hopToken(pi);
+      FX.sound.step();
+      await sleep(230);
     }
   }
 
@@ -317,7 +351,9 @@
     p.inExile = true;
     p.exileTries = 0;
     G.doubles = 0;
+    FX.sound.exile();
     refresh();
+    await sleep(500);
     await alertModal("Exiled to Dapitan 🌴", `<p><b>${esc(p.name)}</b> is sent to Dapitan Exile and does not pass START.</p>
       <p class="fact">On their next turn they can pay ${peso(RULES.exileFee)} or try to roll doubles. After ${RULES.maxExileTurns} failed tries they must pay and move.</p>`);
   }
@@ -338,6 +374,7 @@
         const owner = G.players[own.owner];
         const rent = rentFor(i);
         await alertModal(`Rent due at ${t.name}`, `${deedHtml(i)}<p><b>${esc(p.name)}</b> pays <b>${peso(rent)}</b> rent to <b>${esc(owner.name)}</b>.</p>`, "Pay rent");
+        FX.sound.pay();
         const ok = await pay(pi, own.owner, rent);
         log(`${p.name} paid ${peso(rent)} rent to ${owner.name} for ${t.name}.`);
         if (ok) G.msg = `${p.name} paid ${peso(rent)} rent to ${owner.name}.`;
@@ -372,11 +409,14 @@
     if (choice === "buy") {
       p.money -= t.price;
       G.owned[i] = { owner: pi, level: 0 };
+      FX.sound.coin();
+      stampTile(i);
       log(`${p.name} bought ${t.name} for ${peso(t.price)}.`);
       G.msg = `${p.name} bought ${t.name}!`;
       if (ownsGroup(pi, t.group)) {
         log(`${p.name} now owns all of ${GROUPS[t.group].name}. Rent doubles and landmarks can be built.`);
         toast(`${p.name} completed the ${GROUPS[t.group].name} group!`);
+        FX.confetti(1800, 90);
       }
     } else {
       G.msg = `${p.name} decided not to buy ${t.name}.`;
@@ -387,8 +427,12 @@
     const p = G.players[pi];
     const deck = kind === "noli" ? NOLI_CARDS : FILI_CARDS;
     const card = deck[drawFrom(kind + "Deck", deck)];
-    await alertModal(null, `<div class="card-face ${kind}"><div class="ct">${kind.toUpperCase()}</div>
-      <p class="cx">${esc(card.text)}</p></div><p class="fact">📜 ${esc(card.fact)}</p>`, "OK");
+    FX.sound.card();
+    await alertModal(null, `<div class="flip-scene"><div class="flip-card">
+        <div class="flip-back ${kind}"><span>${kind === "noli" ? "📖" : "🗡️"}</span><b>${kind.toUpperCase()}</b></div>
+        <div class="card-face ${kind}"><div class="ct">${kind === "noli" ? "📖" : "🗡️"} ${kind.toUpperCase()}</div>
+          <p class="cx">${esc(card.text)}</p></div>
+      </div></div><p class="fact">📜 ${esc(card.fact)}</p>`, "OK");
     log(`${p.name} drew ${kind.toUpperCase()}: ${card.text}`);
     G.msg = card.text;
 
@@ -427,7 +471,7 @@
             b.disabled = true;
             if (Number(b.dataset.k) === q.c) b.classList.add("right");
           });
-          if (k !== q.c) btn.classList.add("wrong");
+          if (k !== q.c) { btn.classList.add("wrong"); FX.sound.wrong(); } else { FX.sound.right(); }
           setTimeout(() => { closeModal(); resolve(k === q.c); }, 1300);
         });
       });
@@ -435,6 +479,7 @@
     if (correct) {
       p.money += RULES.quizReward;
       log(`${p.name} answered the quiz correctly and earned ${peso(RULES.quizReward)}.`);
+      FX.confetti(1500, 70);
       G.msg = `Correct! ${p.name} earns ${peso(RULES.quizReward)}.`;
     } else {
       log(`${p.name} missed the quiz question.`);
@@ -446,6 +491,7 @@
     if (busy || G.phase !== "end") return;
     advanceTurn();
     save(); refresh();
+    if (G.phase === "roll") await showSplash();
     await startTurnPrompt();
   }
 
@@ -502,6 +548,8 @@
       .sort((a, b) => b.worth - a.worth);
     const winner = ranking[0].p;
     log(`🏆 ${winner.name} wins!`);
+    FX.sound.fanfare();
+    FX.confetti(5000, 260);
     G.msg = `🏆 ${winner.name} wins!`;
     save(); refresh();
     showWinner(reason, ranking);
@@ -535,6 +583,8 @@
     if (p.money < cost) { toast(`You need ${peso(cost)} to build here.`); return; }
     p.money -= cost;
     own.level++;
+    FX.sound.build();
+    stampTile(i);
     log(`${p.name} built a landmark on ${TILES[i].name} for ${peso(cost)}. Rent is now ${peso(rentFor(i))}.`);
     toast(`Landmark built on ${TILES[i].name}! Rent is now ${peso(rentFor(i))}`);
     save(); refresh();
@@ -544,9 +594,8 @@
      Rendering: sidebar, dice, center
      ========================================================= */
   function renderDice() {
-    const dice = document.querySelectorAll("#dice .die");
-    dice[0].textContent = DICE_FACES[G.lastDice[0]];
-    dice[1].textContent = DICE_FACES[G.lastDice[1]];
+    FX.buildDice($("#dice"));
+    FX.showDice($("#dice"), G.lastDice, false);
   }
 
   function refresh() {
@@ -554,8 +603,10 @@
     renderBoardState();
     const p = cur();
     const c = charById(p.char);
-    $("#turnBanner").innerHTML = G.phase === "over" ? "Game over"
-      : `<div class="avatar" style="background:${c.color}">${c.icon}</div><span>${esc(p.name)}'s turn</span>`;
+    $("#turnBanner").innerHTML = G.phase === "over" ? `<div class="tc-text"><div class="tc-name">Game over</div></div>`
+      : `<div class="avatar" style="background:${c.color}">${c.icon}</div>
+         <div class="tc-text"><div class="tc-name">${esc(p.name)}</div><div class="tc-sub">${esc(c.name)} · ${peso(p.money)}</div></div>`;
+    $("#turnBanner").style.setProperty("--c", c.color);
     $("#turnMsg").textContent = G.msg || "";
     $("#rollBtn").disabled = busy || G.phase !== "roll";
     $("#endBtn").disabled = busy || G.phase !== "end";
@@ -563,16 +614,24 @@
 
     $("#playerList").innerHTML = G.players.map((pl, i) => {
       const ch = charById(pl.char);
-      const sub = pl.bankrupt ? "Bankrupt" : [
-        `${propsOf(i).length} places`,
-        pl.inExile ? "🌴 in exile" : "",
-        pl.freeExit ? "✉️ letter" : "",
-      ].filter(Boolean).join(" · ");
-      return `<div class="p-row ${i === G.turn && G.phase !== "over" ? "current" : ""} ${pl.bankrupt ? "out" : ""}">
+      const tags = pl.bankrupt ? `<span class="tag">💀 Bankrupt</span>` : [
+        pl.inExile ? `<span class="tag">🌴 Exiled</span>` : "",
+        pl.freeExit ? `<span class="tag">✉️ Letter</span>` : "",
+      ].join("");
+      const swatches = propsOf(i).map(t => `<i style="background:${GROUPS[TILES[t].group].color}" title="${esc(TILES[t].name)}"></i>`).join("");
+      return `<div class="p-row ${i === G.turn && G.phase !== "over" ? "current" : ""} ${pl.bankrupt ? "out" : ""}" style="--c:${ch.color}" data-prow="${i}">
         <div class="avatar" style="background:${ch.color}">${ch.icon}</div>
-        <div><div class="p-name">${esc(pl.name)}</div><div class="p-sub">${sub}</div></div>
+        <div class="p-mid"><div class="p-name">${esc(pl.name)} ${tags}</div><div class="p-sub">${esc(ch.name)}</div>
+          <div class="p-swatches">${swatches || `<span class="muted">no places yet</span>`}</div></div>
         <div class="p-money">${peso(pl.money)}</div></div>`;
     }).join("");
+    if (lastMoney) {
+      G.players.forEach((pl, i) => {
+        const d = pl.money - (lastMoney[i] ?? pl.money);
+        if (d !== 0) FX.floatText($(`[data-prow="${i}"] .p-money`), (d > 0 ? "+" : "−") + peso(Math.abs(d)), d > 0);
+      });
+    }
+    lastMoney = G.players.map(pl => pl.money);
 
     const mine = propsOf(G.turn);
     $("#myProps").innerHTML = mine.length === 0 ? `<p class="muted" style="margin:0">${esc(p.name)} owns no places yet.</p>`
@@ -586,6 +645,37 @@
       }).join("");
 
     $("#log").innerHTML = G.log.slice(-60).reverse().map(l => `<li>${esc(l)}</li>`).join("");
+  }
+
+  let lastMoney = null;
+
+  function stampTile(i) {
+    const el = $(`#gameBoard .tile[data-index="${i}"]`);
+    if (!el) return;
+    el.classList.remove("stamp"); void el.offsetWidth; el.classList.add("stamp");
+  }
+
+  function updateMute() { $("#muteBtn").textContent = FX.isMuted() ? "🔇" : "🔊"; }
+
+  function showSplash() {
+    const p = cur();
+    const c = charById(p.char);
+    const sp = $("#splash");
+    sp.style.setProperty("--c", c.color);
+    sp.innerHTML = `<div class="splash-inner">
+      <div class="splash-round">Round ${G.round}${G.maxRounds ? ` of ${G.maxRounds}` : ""}</div>
+      <div class="avatar splash-avatar" style="background:${c.color}">${c.icon}</div>
+      <div class="splash-name">${esc(p.name)}</div>
+      <div class="splash-char">${esc(c.name)}</div>
+      <div class="splash-hint">${p.inExile ? "🌴 You are in Dapitan Exile" : "Pass the device · tap to start your turn"}</div></div>`;
+    sp.classList.remove("hidden");
+    FX.sound.turn();
+    return new Promise(resolve => {
+      let done = false;
+      const close = () => { if (done) return; done = true; sp.classList.add("hidden"); resolve(); };
+      sp.onclick = close;
+      setTimeout(close, 1800);
+    });
   }
 
   function highlight(i) {
@@ -776,9 +866,11 @@
     busy = false;
     showScreen("game");
     buildBoard($("#gameBoard"), true);
+    $("#tokenLayer").innerHTML = "";
+    lastMoney = null;
     renderDice();
     refresh();
-    startTurnPrompt();
+    (G.phase === "roll" ? showSplash() : Promise.resolve()).then(startTurnPrompt);
   }
 
   /* =========================================================
@@ -793,6 +885,7 @@
       else if (act === "howto" || act === "rules") alertModal(null, rulesHtml(), "Got it");
       else if (act === "about") alertModal(null, aboutHtml(), "Close");
       else if (act === "start") startFromSetup();
+      else if (act === "mute") { FX.setMuted(!FX.isMuted()); updateMute(); }
       else if (act === "resume") { G = loadSave(); if (G) enterGame(); }
       else if (act === "quit") {
         const c = await modal({ body: `<h2>Leave the game?</h2><p>Your game is saved on this device. You can resume it from the home page.</p>`,
@@ -816,6 +909,7 @@
   });
 
   buildBoard($("#previewBoard"), false);
+  updateMute();
   renderLandingChars();
   showScreen("landing");
 

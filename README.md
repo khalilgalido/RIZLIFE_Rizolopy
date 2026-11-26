@@ -27,3 +27,4 @@ To host it, turn on GitHub Pages for this repository (Settings → Pages → dep
 - `css/style.css`: styles
 - `js/data.js`: board tiles, characters, cards, quiz questions and rule numbers (edit this to change content or balance)
 - `js/game.js`: game logic and UI
+- `js/fx.js`: 3D dice, sound effects (generated in the browser, no audio files), confetti and floating money text
