@@ -469,6 +469,7 @@ class BoardScene extends Phaser.Scene {
 
   /* ---------- animations (all return promises) ---------- */
   reset() {
+    this.clearBubbles();
     this.tokens.forEach(t => t && t.c.destroy());
     this.tokens = [];
     this.lastTurn = null;
@@ -611,6 +612,93 @@ class BoardScene extends Phaser.Scene {
       fontFamily: SERIF, fontStyle: "900", fontSize: "30px", color: good ? "#1f7a45" : "#b3261e", stroke: "#fffaf0", strokeThickness: 6,
     }).setOrigin(0.5).setDepth(96);
     this.tweens.add({ targets: t, y: y - 90, alpha: { from: 1, to: 0 }, duration: 1500, ease: "Cubic.out", onComplete: () => t.destroy() });
+  }
+
+  /* ---------- chat speech bubbles over tokens ---------- */
+  /** pi = seat (or -1 for a host with no seat, shown at the top of the board) */
+  say(pi, text, color, name) {
+    this.bubbles ||= new Map();
+    const old = this.bubbles.get(pi);
+    if (old) { old.tw && old.tw.stop(); old.c.destroy(); this.bubbles.delete(pi); }
+    const c = this.add.container(0, 0).setDepth(88);
+    const label = pi < 0 ? this.txt(0, 0, name || "Host", {
+      fontFamily: SANS, fontStyle: "900", fontSize: "18px", color: "#6e1a2c",
+    }).setOrigin(0.5, 0) : null;
+    const t = this.txt(0, 0, text, {
+      fontFamily: SANS, fontStyle: "700", fontSize: "25px", color: "#2b1d14", align: "center",
+      wordWrap: { width: 300, useAdvancedWrap: true },
+    }).setOrigin(0.5, 0);
+    const padX = 18, padY = 12, gap = label ? 2 : 0;
+    const w = Math.max(t.width, label ? label.width : 0) + padX * 2;
+    const h = t.height + (label ? label.height + gap : 0) + padY * 2;
+    const g = this.add.graphics();
+    const draw = flip => {
+      g.clear();
+      const top = flip ? 14 : -h - 14;
+      g.fillStyle(0x000000, 0.25).fillRoundedRect(-w / 2 + 2, top + 4, w, h, 16);
+      g.fillStyle(0xfffaf0).fillRoundedRect(-w / 2, top, w, h, 16);
+      g.lineStyle(4, hex(color || "#b8913a")).strokeRoundedRect(-w / 2, top, w, h, 16);
+      // the tail pointing at the token
+      const ty = flip ? top : top + h;
+      const dir = flip ? -1 : 1;
+      g.fillStyle(0xfffaf0).fillTriangle(-11, ty - dir * 2, 11, ty - dir * 2, 0, ty + dir * 16);
+      g.lineStyle(4, hex(color || "#b8913a")).lineBetween(-11, ty, 0, ty + dir * 16).lineBetween(11, ty, 0, ty + dir * 16);
+      if (label) label.setY(top + padY);
+      t.setY(top + padY + (label ? label.height + gap : 0));
+    };
+    c.add([g, ...(label ? [label] : []), t]);
+    const b = { c, w, h, draw, flip: null, pi };
+    this.bubbles.set(pi, b);
+    this.placeBubble(b);
+    c.setScale(0.2).setAlpha(0);
+    this.tweens.add({ targets: c, scale: 1, alpha: 1, duration: 260, ease: "Back.out" });
+    const life = Math.min(7000, 3200 + text.length * 55);
+    b.tw = this.tweens.add({
+      targets: c, alpha: 0, scale: 0.85, delay: life, duration: 350,
+      onComplete: () => { c.destroy(); if (this.bubbles.get(pi) === b) this.bubbles.delete(pi); },
+    });
+  }
+
+  placeBubble(b) {
+    let x, y, flip;
+    if (b.pi < 0) { x = CX; y = O + C + 40; flip = true; }
+    else {
+      const tk = this.tokens[b.pi];
+      if (!tk || !tk.c.visible) { b.c.setVisible(false); return; }
+      b.c.setVisible(true);
+      x = tk.c.x; y = tk.c.y + tk.body.y - 30;
+      flip = y - b.h - 20 < 4;           // near the top edge: hang the bubble below the token
+      if (flip) y = tk.c.y + 26;
+    }
+    if (flip !== b.flip) { b.flip = flip; b.draw(flip); }
+    const half = b.w / 2 + 6;
+    b.c.setPosition(Math.max(half, Math.min(SIZE - half, x)), y);
+  }
+
+  clearBubbles() {
+    if (!this.bubbles) return;
+    this.bubbles.forEach(b => { b.tw && b.tw.stop(); b.c.destroy(); });
+    this.bubbles.clear();
+  }
+
+  update() {
+    if (!this.bubbles || !this.bubbles.size) return;
+    const list = [...this.bubbles.values()];
+    list.forEach(b => this.placeBubble(b));
+    // tokens often share a tile: stack older bubbles above (or below) newer ones instead of overlapping
+    const box = b => {
+      const top = b.flip ? b.c.y + 14 : b.c.y - b.h - 14;
+      return { l: b.c.x - b.w / 2, r: b.c.x + b.w / 2, t: top, btm: top + b.h };
+    };
+    for (let i = list.length - 2; i >= 0; i--) {
+      const older = list[i];
+      if (!older.c.visible) continue;
+      for (let j = list.length - 1; j > i; j--) {
+        const a = box(older), n = box(list[j]);
+        if (!list[j].c.visible || a.r <= n.l || a.l >= n.r || a.btm <= n.t || a.t >= n.btm) continue;
+        older.c.y += older.flip ? n.btm + 6 - a.t : n.t - 6 - a.btm;
+      }
+    }
   }
 
   confetti(n = 120) {

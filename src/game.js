@@ -8,6 +8,7 @@ import * as AI from "./ai.js";
 import { createTutorial, tutorialSeen, markSeen, TUTORIAL_PLAYERS } from "./tutorial.js";
 import { initOnline } from "./online.js";
 import { initCertificates, newStats } from "./certificate.js";
+import { createChat, makeChatGate } from "./chat.js";
 
 export function boot() {
 
@@ -734,7 +735,10 @@ export function boot() {
       }).join("");
 
     $("#log").innerHTML = G.log.slice(-60).reverse().map(l => `<li>${esc(l)}</li>`).join("");
+    if (!!G.chatOff !== lastChatOff) { lastChatOff = !!G.chatOff; chat.refreshPanel(); }
+    chat.sync();
   }
+  let lastChatOff = false;
 
   let lastMoney = null;
 
@@ -1272,6 +1276,11 @@ export function boot() {
       else if (m.a === "end") onEndTurn();
       else if (m.a === "build") build(Number(m.i));
       refresh();
+    } else if (m.t === "chat") {
+      const seat = seatOfCid(m.cid);
+      if (seat < 0 || G.chatOff) return;
+      const text = chatGate(m.cid, m.text);
+      if (text) broadcastChat(seat, text);
     } else if (m.t === "answer") {
       if (netModal && netModal.mid === m.mid && seatOfCid(m.cid) === netModal.decider) resolveNetModal(m.mid, m.value);
     } else if (m.t === "_reconnected") {
@@ -1286,6 +1295,7 @@ export function boot() {
     G = null;
   }
   function guestMessage(m) {
+    if (m.t === "chat") { if (G) chat.receive(m); return; } // chat never waits behind animations
     guestBacklog++;
     guestQueue = guestQueue.then(() => guestApply(m, guestBacklog > 10)).catch(err => console.error(err)).finally(() => { guestBacklog--; });
   }
@@ -1358,6 +1368,7 @@ export function boot() {
     NET = null; netModal = null; busy = false; guestMid = null; guestModalMsg = null;
     if (wasGuest) G = null;
     setBanner(null);
+    chat.reset();
   }
 
   const certs = initCertificates({
@@ -1373,6 +1384,36 @@ export function boot() {
     if (!list.length) { toast(NET && NET.mySeat < 0 ? "Certificates go to the players. This screen was the shared board." : "No certificate on this screen."); return; }
     certs.open(list, { fromGame: true });
   }
+
+  /* ---- chat (online games only) ---- */
+  const chatGate = makeChatGate();
+  /** host: pass a (filtered) message to every screen, including this one */
+  function broadcastChat(seat, text) {
+    const msg = { t: "chat", seat, text };
+    NET.room.send(msg);
+    chat.receive(msg);
+  }
+  const chat = createChat({
+    info: () => ({
+      online: !!NET && !!G && !tut.active,
+      isHost: isHost(),
+      mySeat: NET ? NET.mySeat : -1,
+      chatOff: !!(G && G.chatOff),
+      players: G ? G.players.map(p => ({ name: p.name, char: p.char, ai: !!AI.isAI(p) })) : [],
+    }),
+    send: text => {
+      if (isGuest()) NET.room.send({ t: "chat", text });
+      else if (isHost()) { const t = chatGate("host", text); if (t) broadcastChat(NET.mySeat, t); }
+    },
+    setChatOff: off => {
+      if (!isHost() || !G) return;
+      G.chatOff = off;
+      toast(off ? "Chat is off for players." : "Chat is back on.", true);
+      save(); refresh();
+    },
+    sayOnBoard: (seat, text, color, name) => { if (board) board.say(seat, text, color, name); },
+    sound: () => FX.sound.chat(),
+  });
 
   const online = initOnline({
     showScreen,

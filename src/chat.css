@@ -1,0 +1,76 @@
+/* ---------- in-game chat (online) ---------- */
+.p-row { position: relative; }
+.p-bubble {
+  position: absolute; left: 62px; top: 50%; transform: translateY(-50%);
+  max-width: calc(100% - 72px); z-index: 3;
+  background: #fffaf0; color: var(--ink); font-weight: 700; font-size: .9rem; line-height: 1.2;
+  padding: 6px 10px; border-radius: 12px; border: 2px solid var(--c, var(--gold));
+  box-shadow: 0 4px 12px rgba(60,30,10,.25);
+  overflow-wrap: anywhere; pointer-events: none;
+}
+.p-bubble::before {
+  content: ""; position: absolute; left: -9px; top: 50%; margin-top: -7px;
+  border: 7px solid transparent; border-right: 9px solid var(--c, var(--gold)); border-left: 0;
+}
+.p-bubble.pop { animation: chatPop .28s cubic-bezier(.3,1.6,.5,1); }
+@keyframes chatPop { from { transform: translateY(-50%) scale(.3); opacity: 0; } to { transform: translateY(-50%) scale(1); opacity: 1; } }
+
+.chat-fab {
+  position: fixed; right: 18px; bottom: 18px; z-index: 40;
+  width: 58px; height: 58px; border-radius: 50%; font-size: 1.6rem; line-height: 1;
+  background: var(--maroon); color: #fff; border: 3px solid var(--gold-light);
+  box-shadow: 0 8px 22px rgba(60,20,10,.4); display: grid; place-items: center;
+  transition: transform .15s;
+}
+.chat-fab:hover { transform: scale(1.08); }
+.chat-fab img.emo { height: 1.5rem; }
+.chat-badge {
+  position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px;
+  border-radius: 11px; background: #e23b2e; color: #fff; font: 900 .78rem/22px var(--sans);
+  border: 2px solid #fff; animation: chatPop .3s;
+}
+.chat-panel {
+  position: fixed; right: 18px; bottom: 88px; z-index: 41;
+  width: 340px; max-width: calc(100vw - 32px);
+  background: var(--cream); border: 2px solid var(--gold-light); border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(60,20,10,.35); padding: 10px 12px 12px;
+  display: flex; flex-direction: column; gap: 8px; animation: fade .15s;
+}
+.chat-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--serif); font-size: 1.05rem; color: var(--maroon); }
+.chat-x { background: none; border: 0; font-size: 1.05rem; padding: 4px 6px; border-radius: 6px; color: var(--ink); }
+.chat-x:hover { background: #f0dcb0; }
+.chat-log {
+  list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 4px;
+  max-height: 200px; min-height: 60px; overflow-y: auto; background: #fff8e8; border-radius: 8px; font-size: .9rem;
+}
+.chat-log li { padding: 4px 8px; border-radius: 8px; border-left: 4px solid var(--c); background: #fff; overflow-wrap: anywhere; }
+.chat-log li b { color: var(--c); filter: brightness(.7); margin-right: 2px; }
+.chat-log li.mine { background: #fdf2d8; }
+.chat-log li.chat-empty { border: 0; background: none; text-align: center; }
+.chat-quick { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.chat-quick button {
+  flex: none; border: 1.5px solid var(--gold-light); background: #fff; border-radius: 999px;
+  padding: 5px 10px; font-size: .82rem; font-weight: 700; color: var(--maroon); white-space: nowrap;
+}
+.chat-quick button:hover { background: #fdf2d8; }
+.chat-form { display: flex; gap: 6px; }
+.chat-form input {
+  flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px; border: 2px solid var(--gold-light);
+  font: 1rem var(--sans); background: #fff;
+}
+.chat-form input:focus { outline: none; border-color: var(--maroon); }
+.chat-form .btn { padding: 8px 14px; }
+.chat-form input.shake { animation: chatShake .35s; }
+@keyframes chatShake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.chat-off { margin: 0; font-size: .85rem; color: var(--muted); text-align: center; }
+.chat-opt { display: flex; gap: 8px; align-items: flex-start; font-size: .92rem; }
+.chat-sub { font-weight: 900; font-size: .85rem; color: var(--maroon); margin-top: 4px; }
+.chat-mutes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .9rem; }
+.chat-note { font-size: .8rem; margin: 2px 0 0; }
+
+@media (max-width: 600px) {
+  .chat-fab { width: 52px; height: 52px; right: 12px; bottom: 12px; font-size: 1.4rem; }
+  .chat-panel { right: 8px; left: 8px; bottom: 72px; width: auto; max-width: none; }
+  .chat-log { max-height: 28vh; }
+  .chat-form input { font-size: 16px; } /* stops iOS zooming in */
+}
