@@ -849,6 +849,7 @@ export function boot() {
       const guard = fn => (...a) => {
         if (!$("#modal").classList.contains("hidden") || !$("#splash").classList.contains("hidden")) return;
         if (Date.now() - lastOverlayClose < 400) return;
+        if (tut.justPressed()) return;
         fn(...a);
       };
       board = await createBoard($("#gameBoard"), {

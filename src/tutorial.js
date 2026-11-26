@@ -52,7 +52,7 @@ const STEPS = [
   { silent: true, wait: "rent" },
   { target: "modal", title: "Paying rent", text: d => `You landed on Friend's place, so you pay <b>${peso(d.amount)}</b> rent. Rent is a tenth of the price, and it <b>doubles</b> when one player owns the whole colour group.`, wait: "rentPaid", tap: true },
   { target: "#playerList", title: "Money moves", text: `The rent went from your purse to Friend's. Keep an eye on everyone's Piso here.` },
-  { target: "end", text: `End your turn.`, wait: "turnEnded", tap: true },
+  { target: "end", title: "End your turn", text: `Tap <b>End Turn</b>.`, wait: "turnEnded", tap: true },
 
   { silent: true, wait: "turnStart" },
   { target: "roll", title: "Friend's turn", text: `Roll for Friend.`, wait: "rolled", tap: true },
@@ -60,20 +60,20 @@ const STEPS = [
   { target: "modal", title: "NOLI cards", text: `Friend landed on a <b>NOLI</b> tile and drew a card. NOLI cards come from <i>Noli Me Tangere</i> (1887) and each one teaches a fact. They can give or take Piso, or move you.`, wait: "exiled", tap: true },
   { target: "modal", title: "Dapitan Exile", text: `This card sends Friend to <b>Dapitan Exile</b>, where Rizal really was exiled from 1892 to 1896. Rolling doubles three times in a row also sends you there.`, wait: "rollDone", tap: true },
   { target: { tile: 8 }, title: "Stuck in Dapitan", text: `While exiled, Friend can't move until they pay or roll doubles. Landing here normally is just a visit.` },
-  { target: "end", text: `End Friend's turn.`, wait: "turnEnded", tap: true },
+  { target: "end", title: "End Friend's turn", text: `Tap <b>End Turn</b> and pass the device back.`, wait: "turnEnded", tap: true },
 
   { silent: true, wait: "turnStart" },
   { target: "roll", title: "Your turn", text: `Roll the dice.`, wait: "rolled", tap: true },
   { silent: true, wait: "card" },
   { target: "modal", title: "FILI cards", text: `A <b>FILI</b> tile! These cards come from <i>El Filibusterismo</i> (1891). This one pays you <b>₱200</b>.`, wait: "cardDone", tap: true },
-  { target: "end", text: `End your turn.`, wait: "turnEnded", tap: true },
+  { target: "end", title: "End your turn", text: `Tap <b>End Turn</b>.`, wait: "turnEnded", tap: true },
 
   { silent: true, wait: "exilePrompt" },
   { target: "modal", title: "Leaving exile", text: `Friend starts the turn in Dapitan. Pay <b>₱50</b> to leave now, or roll and hope for <b>doubles</b>. After 3 failed tries you must pay. Pick either one.`, wait: "exileChoice", tap: true },
   { target: "roll", title: "Roll", text: d => d.choice === "roll" ? `Roll for doubles.` : `Friend is free. Roll the dice.`, wait: "rolled", tap: true },
   { silent: true, wait: "rollDone" },
   { target: { tile: 16 }, title: "Café Rest", text: d => `${d.exileDoubles ? "Doubles! Friend left Dapitan and" : "Friend"} reached <b>Café Rest</b>, a safe corner where nothing happens.` },
-  { target: "end", text: `End Friend's turn.`, wait: "turnEnded", tap: true },
+  { target: "end", title: "End Friend's turn", text: `Tap <b>End Turn</b> and pass the device back.`, wait: "turnEnded", tap: true },
 
   { silent: true, wait: "turnStart" },
   { target: "roll", title: "Last roll", text: `One more roll for you.`, wait: "rolled", tap: true },
@@ -87,6 +87,7 @@ const STEPS = [
         <li>The game ends at the round limit or when one player is left. Highest <b>net worth</b> wins.</li>
       </ul>` },
 ];
+const TURN_EDGES = ["turnEnded", "turnStart", "exilePrompt"];
 const COUNTED = STEPS.filter(s => !s.silent).length;
 
 export function createTutorial({ getBoard, onExit }) {
@@ -97,6 +98,7 @@ export function createTutorial({ getBoard, onExit }) {
   let draws = {};
   let raf = 0;
   let root = null, spot = null, dim = null, bubble = null;
+  let lastPress = 0;
 
   function mount() {
     root = document.createElement("div");
@@ -107,6 +109,10 @@ export function createTutorial({ getBoard, onExit }) {
     dim = root.querySelector(".tut-dim");
     spot = root.querySelector(".tut-spot");
     bubble = root.querySelector(".tut-bubble");
+    // Phaser listens for pointerup on the whole window, so a tap on the bubble could
+    // also "tap" the board tile underneath it. The game asks justPressed() to ignore it.
+    bubble.addEventListener("pointerdown", () => { lastPress = Date.now(); });
+    bubble.addEventListener("pointerup", () => { lastPress = Date.now(); });
     bubble.addEventListener("click", e => {
       const b = e.target.closest("[data-tut]");
       if (!b) return;
@@ -136,6 +142,7 @@ export function createTutorial({ getBoard, onExit }) {
     active = false;
     cancelAnimationFrame(raf);
     if (root) root.classList.remove("on");
+    document.body.classList.remove("tut-dock");
   }
 
   function finish(choice) {
@@ -149,6 +156,7 @@ export function createTutorial({ getBoard, onExit }) {
     const s = STEPS[idx];
     if (!s) return;
     root.classList.toggle("silent", !!s.silent);
+    document.body.classList.remove("tut-dock");
     if (s.silent) return;
     const n = STEPS.slice(0, idx + 1).filter(x => !x.silent).length;
     const text = typeof s.text === "function" ? s.text(data) : s.text;
@@ -190,7 +198,7 @@ export function createTutorial({ getBoard, onExit }) {
     Object.assign(data, d);
     for (let k = idx; k < Math.min(STEPS.length, idx + 6); k++) {
       if (STEPS[k].wait === name) { go(k + 1); return; }
-      if (k > idx && STEPS[k].wait === "turnStart") return; // never skip into the next turn
+      if (TURN_EDGES.includes(STEPS[k].wait)) return; // never skip across a turn change
     }
   }
 
@@ -277,7 +285,15 @@ export function createTutorial({ getBoard, onExit }) {
     bubble.style.width = `${bw}px`;
     const bh = bubble.offsetHeight;
     let x, y;
-    if (!r) {
+    // On small screens a dialog fills the view, so the bubble docks at the top and the
+    // dialog is pushed down below it instead of being covered.
+    const dock = s.target === "modal" && modalOpen && vw < 760;
+    document.body.classList.toggle("tut-dock", dock);
+    if (dock) {
+      document.body.style.setProperty("--tut-h", `${bh}px`);
+      x = (vw - bw) / 2; y = 10;
+      spot.style.display = "none";
+    } else if (!r) {
       x = (vw - bw) / 2; y = (vh - bh) / 2;
       if (modalOpen) y = 12;
     } else {
@@ -311,6 +327,7 @@ export function createTutorial({ getBoard, onExit }) {
 
   return {
     get active() { return active; },
+    justPressed: () => active && Date.now() - lastPress < 500,
     start, stop, emit, rollFor, forceDraw,
   };
 }
