@@ -63,6 +63,7 @@ export const FX = (function () {
     turn() { tone(587, 0.1, { type: "triangle", vol: 0.1 }); tone(880, 0.18, { type: "triangle", vol: 0.1, delay: 0.09 }); },
     exile() { [392, 349, 311, 262].forEach((f, i) => tone(f, 0.22, { type: "triangle", vol: 0.1, delay: i * 0.14 })); },
     fanfare() { [523, 523, 523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, { type: "square", vol: 0.06, delay: i * 0.13 })); },
+    chat() { tone(880, 0.06, { type: "sine", vol: 0.05 }); tone(1175, 0.08, { type: "sine", vol: 0.05, delay: 0.06 }); },
     build() { tone(330, 0.08, { type: "square", vol: 0.07 }); tone(494, 0.08, { type: "square", vol: 0.07, delay: 0.09 }); tone(659, 0.2, { type: "square", vol: 0.07, delay: 0.18 }); },
   };
 
