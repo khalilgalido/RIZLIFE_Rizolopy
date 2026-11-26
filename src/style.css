@@ -575,3 +575,27 @@ img.emo { height: 1.15em; width: auto; vertical-align: -0.22em; display: inline-
 .phaser-board { overflow: hidden; min-width: 0; }
 .game-board-wrap { min-width: 0; }
 @media (max-width: 1000px) { .game-layout { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- original illustrated art ---------- */
+img.portrait { width: 100%; height: 100%; border-radius: 50%; display: block; object-fit: cover; }
+.avatar { overflow: hidden; padding: 0; }
+.mini-char img.portrait { width: 100%; height: 100%; }
+.winner-list img.portrait { width: 1.6em; height: 1.6em; display: inline-block; vertical-align: middle; margin-right: 6px; border: 2px solid var(--gold); }
+.baybayin { font-family: "Noto Sans Tagalog", serif; color: var(--gold); letter-spacing: .3em; font-size: 1.4rem; margin: .2rem 0 0; }
+/* landing preview: same capiz window and banig frame as the game board */
+#previewBoard {
+  border: 1.6cqw solid transparent;
+  background:
+    linear-gradient(var(--cream-2), var(--cream-2)) padding-box,
+    repeating-conic-gradient(#8a2338 0 25%, #b8913a 0 50%) 0 0 / 1.6cqw 1.6cqw border-box;
+  box-shadow: 0 0 0 .5cqw #4a0f1c, inset 0 0 0 .3cqw var(--gold), 0 2cqw 4cqw rgba(60,25,5,.45);
+}
+#previewBoard .board-center {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,243,214,.8), rgba(255,243,214,0) 65%),
+    linear-gradient(90deg, rgba(138,90,43,.35) 2px, transparent 2px) 0 0 / 8.33% 8.33%,
+    linear-gradient(rgba(138,90,43,.35) 2px, transparent 2px) 0 0 / 8.33% 8.33%,
+    linear-gradient(135deg, #fbf6ee, #efe4ef 50%, #f6efe2);
+}
+#previewBoard .tile .t-icon img.emo { height: 2.1em; }
+#previewBoard .tile.corner .t-icon img.emo { height: 2.6em; }

@@ -7,6 +7,7 @@ import "@fontsource/playfair-display/latin-400-italic.css";
 import "@fontsource/lato/latin-400.css";
 import "@fontsource/lato/latin-700.css";
 import "@fontsource/lato/latin-900.css";
+import "@fontsource/noto-sans-tagalog/400.css";
 import "./style.css";
 import { startEmojiArt } from "./art.js";
 import { boot } from "./game.js";
@@ -20,4 +21,5 @@ Promise.all([
   document.fonts.load('700 13px "Lato"'),
   document.fonts.load('900 24px "Lato"'),
   document.fonts.load('400 12px "Lato"'),
+  document.fonts.load('400 24px "Noto Sans Tagalog"', "ᜇᜒᜐᜎ᜔"),
 ]).catch(() => {}).finally(boot);

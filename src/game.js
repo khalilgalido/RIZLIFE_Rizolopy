@@ -3,6 +3,7 @@ import { GROUPS, TILES, EXILE_INDEX, CHARACTERS, NOLI_CARDS, FILI_CARDS, QUIZ, R
 import { FX } from "./fx.js";
 import { createBoard } from "./board.js";
 import { gsap } from "gsap";
+import { portrait } from "./art.js";
 
 export function boot() {
 
@@ -499,9 +500,9 @@ export function boot() {
     const w = ranking[0].p;
     const c = charById(w.char);
     const choice = await modal({
-      body: `<div style="text-align:center"><div class="avatar" style="background:${c.color}">${c.icon}</div>
+      body: `<div style="text-align:center"><div class="avatar" style="background:${c.color}">${portrait(c)}</div>
         <h2>🏆 ${esc(w.name)} wins!</h2><p class="muted">${esc(reason)} The wealthiest player builds the greatest legacy.</p></div>
-        <ul class="winner-list">${ranking.map(r => `<li><span>${charById(r.p.char).icon} ${esc(r.p.name)}</span><span>${r.p.bankrupt ? "Bankrupt" : peso(r.worth)}</span></li>`).join("")}</ul>
+        <ul class="winner-list">${ranking.map(r => `<li><span>${portrait(charById(r.p.char))} ${esc(r.p.name)}</span><span>${r.p.bankrupt ? "Bankrupt" : peso(r.worth)}</span></li>`).join("")}</ul>
         <p class="fact">Net worth counts cash plus the price of every place and landmark owned.</p>`,
       buttons: [
         { label: "View board", value: "stay", cls: "btn-outline" },
@@ -547,7 +548,7 @@ export function boot() {
       ].join("");
       const swatches = propsOf(i).map(t => `<i style="background:${GROUPS[TILES[t].group].color}" title="${esc(TILES[t].name)}"></i>`).join("");
       return `<div class="p-row ${i === G.turn && G.phase !== "over" ? "current" : ""} ${pl.bankrupt ? "out" : ""}" style="--c:${ch.color}" data-prow="${i}">
-        <div class="avatar" style="background:${ch.color}">${ch.icon}</div>
+        <div class="avatar" style="background:${ch.color}">${portrait(ch)}</div>
         <div class="p-mid"><div class="p-name">${esc(pl.name)} ${tags}</div><div class="p-sub">${esc(ch.name)}</div>
           <div class="p-swatches">${swatches || `<span class="muted">no places yet</span>`}</div></div>
         <div class="p-money">${peso(pl.money)}</div></div>`;
@@ -593,7 +594,7 @@ export function boot() {
     sp.style.setProperty("--c", c.color);
     sp.innerHTML = `<div class="splash-inner">
       <div class="splash-round">Round ${G.round}${G.maxRounds ? ` of ${G.maxRounds}` : ""}</div>
-      <div class="avatar splash-avatar" style="background:${c.color}">${c.icon}</div>
+      <div class="avatar splash-avatar" style="background:${c.color}">${portrait(c)}</div>
       <div class="splash-name">${esc(p.name)}</div>
       <div class="splash-char">${esc(c.name)}</div>
       <div class="splash-hint">${p.inExile ? "🌴 You are in Dapitan Exile" : "Pass the device · tap to start your turn"}</div></div>`;
@@ -726,7 +727,7 @@ export function boot() {
   function renderLandingChars() {
     $("#landingChars").innerHTML = CHARACTERS.map(c => `
       <div class="char-card" data-char="${c.id}" tabindex="0" role="button" aria-label="Play as ${esc(c.name)}">
-        <div class="avatar" style="background:${c.color}">${c.icon}</div>
+        <div class="avatar" style="background:${c.color}">${portrait(c)}</div>
         <h3>${esc(c.name)}</h3>
         <div class="char-kind">${esc(c.kind)}</div>
         <p>${esc(c.blurb)}</p>
@@ -770,13 +771,13 @@ export function boot() {
       const c = charById(s.char);
       return `<div class="slot">
         <div class="slot-top">
-          <div class="avatar" style="background:${c.color};width:44px;height:44px;font-size:1.4rem;margin:0;border-width:2px">${c.icon}</div>
+          <div class="avatar" style="background:${c.color};width:44px;height:44px;font-size:1.4rem;margin:0;border-width:2px">${portrait(c)}</div>
           <input type="text" maxlength="16" value="${esc(s.name)}" data-slot="${idx}" aria-label="Player ${idx + 1} name">
         </div>
         <div class="slot-chars">${CHARACTERS.map(ch => {
           const taken = slots.some((o, j) => j !== idx && o.char === ch.id);
           return `<button class="mini-char ${ch.id === s.char ? "on" : ""}" style="background:${ch.color}" title="${esc(ch.name)}"
-            data-slot="${idx}" data-char="${ch.id}" ${taken ? "disabled" : ""}>${ch.icon}</button>`;
+            data-slot="${idx}" data-char="${ch.id}" ${taken ? "disabled" : ""}>${portrait(ch)}</button>`;
         }).join("")}</div>
         <div class="chosen">${esc(c.name)} · ${esc(c.kind)}</div>
       </div>`;

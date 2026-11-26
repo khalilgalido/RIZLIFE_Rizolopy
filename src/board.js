@@ -1,9 +1,9 @@
 /* Rizalopoly board, dice and tokens rendered with Phaser 3. */
 import Phaser from "phaser";
 import { TILES, GROUPS, CHARACTERS } from "./data.js";
-import { artUrl, artKey, ALL_ART } from "./art.js";
+import { artKey, charKey, ALL_ART } from "./art.js";
 
-const O = 22;                       // frame thickness
+const O = 34;                       // frame thickness (banig band)
 const B = 1000;                     // board size inside frame
 const SIZE = B + O * 2;
 const C = (B * 1.35) / 9.7;         // corner tile size
@@ -50,11 +50,14 @@ class BoardScene extends Phaser.Scene {
   }
 
   preload() {
-    ALL_ART.forEach(({ key, url }) => this.load.image(key, url));
+    ALL_ART.forEach(({ key, url, svg, size }) => (svg ? this.load.svg(key, url, { width: size, height: size }) : this.load.image(key, url)));
   }
 
   txt(x, y, s, style) {
     return this.add.text(x, y, s, { resolution: 2, ...style });
+  }
+  portrait(x, y, ch, size) {
+    return this.add.image(x, y, charKey(ch.id)).setDisplaySize(size, size);
   }
   art(x, y, emoji, size) {
     const key = artKey(emoji);
@@ -97,35 +100,92 @@ class BoardScene extends Phaser.Scene {
   }
 
   /* ---------- static drawing ---------- */
+  /* Frame: lacquered wood with a banig (woven mat) band and gold rosettes at the corners. */
   drawFrame() {
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.25).fillRoundedRect(6, 12, SIZE - 12, SIZE - 8, 26);
     g.fillStyle(COLORS.maroonDark).fillRoundedRect(0, 0, SIZE, SIZE, 24);
-    g.fillStyle(COLORS.maroon).fillRoundedRect(4, 4, SIZE - 8, SIZE - 8, 22);
-    g.lineStyle(3, COLORS.gold).strokeRoundedRect(O - 9, O - 9, B + 18, B + 18, 10);
-    g.lineStyle(1, COLORS.goldLight, 0.6).strokeRoundedRect(O - 14, O - 14, B + 28, B + 28, 14);
-    g.fillStyle(COLORS.cream2).fillRect(O, O, B, B);
+    g.fillStyle(COLORS.maroon).fillRoundedRect(3, 3, SIZE - 6, SIZE - 6, 22);
+    // banig weave: interlaced diamonds in two colours around the band
+    const weave = this.add.graphics();
+    const cell = 12, band0 = 8, band1 = O - 8;
+    const cols = [0x8a2338, 0xb8913a, 0x5a1424, 0xd9bf7a];
+    for (let y = band0; y < SIZE - band0; y += cell) {
+      for (let x = band0; x < SIZE - band0; x += cell) {
+        const inBand = x < band1 || y < band1 || x > SIZE - band1 - cell || y > SIZE - band1 - cell;
+        if (!inBand) continue;
+        const k = ((Math.floor(x / cell) + Math.floor(y / cell)) % 2) + ((Math.floor(x / cell / 3) + Math.floor(y / cell / 3)) % 2) * 2;
+        weave.fillStyle(cols[k], 1).fillPoints([
+          { x: x + cell / 2, y }, { x: x + cell, y: y + cell / 2 }, { x: x + cell / 2, y: y + cell }, { x, y: y + cell / 2 },
+        ], true);
+      }
+    }
+    weave.lineStyle(2, COLORS.gold).strokeRoundedRect(band0 - 1, band0 - 1, SIZE - 2 * band0 + 2, SIZE - 2 * band0 + 2, 16);
+    g.lineStyle(3, COLORS.gold).strokeRect(O - 5, O - 5, B + 10, B + 10);
+    g.fillStyle(COLORS.maroonDark).fillRect(O - 4, O - 4, B + 8, B + 8);
+    g.setDepth(0); weave.setDepth(1);
+    const inner = this.add.graphics().setDepth(2);
+    inner.fillStyle(COLORS.cream2).fillRect(O, O, B, B);
+    // corner rosettes (calado-style carving)
+    [[O / 2, O / 2], [SIZE - O / 2, O / 2], [O / 2, SIZE - O / 2], [SIZE - O / 2, SIZE - O / 2]].forEach(([x, y]) => {
+      const r = this.add.graphics().setDepth(3);
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4;
+        r.fillStyle(COLORS.gold).fillCircle(x + Math.cos(a) * 9, y + Math.sin(a) * 9, 6);
+      }
+      r.fillStyle(COLORS.maroonDark).fillCircle(x, y, 8).fillStyle(COLORS.goldLight).fillCircle(x, y, 5);
+    });
   }
 
+  /* Centre: light through a capiz-shell window, with baybayin lettering under the logo. */
   drawCenter() {
     const x0 = O + C, y0 = O + C, s = B - 2 * C;
-    const g = this.add.graphics();
-    g.fillStyle(0xf1e0b8).fillRect(x0, y0, s, s);
-    g.lineStyle(10, 0xe8d3a5, 0.6);
-    for (let k = -s; k < s; k += 28) g.lineBetween(x0 + k, y0 + s, x0 + k + s, y0);
-    // soft light in the middle
-    const glow = this.add.graphics();
-    for (let r = 340; r > 0; r -= 20) glow.fillStyle(0xfff8e6, 0.035).fillCircle(CX, CX + 20, r);
+    const g = this.add.graphics().setDepth(3);
+    g.fillStyle(0xf3e6c8).fillRect(x0, y0, s, s);
+    // capiz panes: pearly squares set in a wooden lattice
+    const pane = s / 12;
+    for (let r = 0; r < 12; r++) {
+      for (let c = 0; c < 12; c++) {
+        const px = x0 + c * pane, py = y0 + r * pane;
+        const tint = (r * 7 + c * 3) % 5;
+        const top = [0xfbf6ee, 0xf6efe9, 0xf9f3ea, 0xf3ecef, 0xfaf4e6][tint];
+        g.fillGradientStyle(top, 0xefe4ef, 0xf1e6d6, top, 1).fillRect(px + 2, py + 2, pane - 4, pane - 4);
+        g.fillStyle(0xffffff, 0.45).fillEllipse(px + pane * 0.38, py + pane * 0.32, pane * 0.4, pane * 0.18);
+      }
+    }
+    g.lineStyle(4, 0x8a5a2b, 0.4);
+    for (let k = 0; k <= 12; k++) { g.lineBetween(x0 + k * pane, y0, x0 + k * pane, y0 + s); g.lineBetween(x0, y0 + k * pane, x0 + s, y0 + k * pane); }
+    g.lineStyle(2, 0x8a5a2b, 0.12);
+    for (let k = 0; k < 12; k += 3) {
+      for (let j = 0; j < 12; j += 3) {
+        const cx = x0 + (k + 1.5) * pane, cy = y0 + (j + 1.5) * pane;
+        g.strokeCircle(cx, cy, pane * 1.3);
+      }
+    }
+    // warm light falling through the window, strongest in the middle
+    const glow = this.add.graphics().setDepth(3);
+    for (let r = 380; r > 0; r -= 20) glow.fillStyle(0xfff3d6, 0.05).fillCircle(CX, CX + 20, r);
     const mask = this.make.graphics({}, false).fillRect(x0, y0, s, s).createGeometryMask();
     g.setMask(mask); glow.setMask(mask);
-    g.lineStyle(2, COLORS.goldLight).strokeRect(x0, y0, s, s);
+    const edge = this.add.graphics().setDepth(4);
+    edge.lineStyle(6, 0x6b4423).strokeRect(x0 + 3, y0 + 3, s - 6, s - 6);
+    edge.lineStyle(2, COLORS.gold).strokeRect(x0 + 9, y0 + 9, s - 18, s - 18);
 
+    // logo banner
+    const banner = this.add.graphics().setDepth(5);
+    banner.fillStyle(0xfff8ea, 0.82).fillRoundedRect(CX - 300, O + 170, 600, 150, 28);
+    banner.lineStyle(3, COLORS.gold, 0.9).strokeRoundedRect(CX - 300, O + 170, 600, 150, 28);
     this.logo = this.txt(CX, O + 225, "RIZALOPOLY", {
       fontFamily: SERIF, fontStyle: "900", fontSize: "72px", color: "#6e1a2c",
-    }).setOrigin(0.5).setAngle(-6).setShadow(0, 4, "rgba(110,26,44,0.25)", 10);
-    this.txt(CX + 10, O + 285, "Travel Through History", {
-      fontFamily: SERIF, fontStyle: "italic 600", fontSize: "26px", color: "#1e4d3a",
-    }).setOrigin(0.5).setAngle(-4);
+    }).setOrigin(0.5).setAngle(-3).setShadow(0, 4, "rgba(110,26,44,0.25)", 10).setDepth(6);
+    this.txt(CX, O + 280, "Travel Through History", {
+      fontFamily: SERIF, fontStyle: "italic 600", fontSize: "24px", color: "#1e4d3a",
+    }).setOrigin(0.5).setDepth(6);
+    // "Rizal" in baybayin, between two gold rules
+    this.txt(CX, O + 306, "ᜇᜒᜐᜎ᜔", {
+      fontFamily: "'Noto Sans Tagalog', serif", fontSize: "24px", color: "#b8913a",
+    }).setOrigin(0.5).setDepth(6);
+    banner.lineStyle(2, COLORS.gold).lineBetween(CX - 150, O + 307, CX - 50, O + 307).lineBetween(CX + 50, O + 307, CX + 150, O + 307);
   }
 
   drawTile(t, i) {
@@ -154,19 +214,19 @@ class BoardScene extends Phaser.Scene {
     c.add(g);
 
     if (t.type === "property") {
-      c.add(this.art(0, -12, t.icon, 34));
+      c.add(this.art(0, -10, t.icon, 46));
       c.add(this.txt(0, 18, t.name, {
         fontFamily: SANS, fontStyle: "700", fontSize: "13px", color: "#2b1d14", align: "center",
         wordWrap: { width: r.w - 8 }, lineSpacing: -3,
       }).setOrigin(0.5));
       c.add(this.txt(0, hh - 12, "₱" + t.price, { fontFamily: SANS, fontSize: "12px", color: "#6b5a45" }).setOrigin(0.5));
     } else if (t.type === "noli" || t.type === "fili") {
-      c.add(this.art(0, -12, t.icon, 44));
+      c.add(this.art(0, -12, t.icon, 58));
       c.add(this.txt(0, 26, t.name, {
         fontFamily: SERIF, fontStyle: "900", fontSize: "17px", color: t.type === "noli" ? "#6e1a2c" : "#f1d58a",
       }).setOrigin(0.5));
     } else {
-      const icon = this.art(0, -14, t.icon, 64);
+      const icon = this.art(0, -14, t.icon, 84);
       c.add(icon);
       this.tweens.add({ targets: icon, y: -20, duration: 1600 + i * 40, yoyo: true, repeat: -1, ease: "Sine.inOut" });
       c.add(this.txt(0, 38, t.name, {
@@ -327,8 +387,7 @@ class BoardScene extends Phaser.Scene {
       .fillStyle(0xffd34d, 0.5).fillCircle(shift + 42, 0, 36)
       .fillStyle(hex(ch.color)).fillCircle(shift + 42, 0, 30)
       .lineStyle(3, COLORS.gold).strokeCircle(shift + 42, 0, 30);
-    const key = artKey(ch.icon);
-    this.plateArt.setTexture(key).setDisplaySize(40, 40).setPosition(shift + 42, 0).setVisible(true);
+    this.plateArt.setTexture(charKey(ch.id)).setDisplaySize(58, 58).setPosition(shift + 42, 0).setVisible(true);
     this.plateName.setX(shift + 86); this.plateSub.setX(shift + 86);
     if (this.lastTurn !== G.turn) {
       this.lastTurn = G.turn;
@@ -356,7 +415,7 @@ class BoardScene extends Phaser.Scene {
       const mx = tw / 2 - 14, my = -th / 2 + 12;
       const mg = this.add.graphics().fillStyle(0xffffff).fillCircle(mx, my, 13).fillStyle(hex(oc.color)).fillCircle(mx, my, 10.5);
       tile.marks.add(mg);
-      tile.marks.add(this.art(mx, my, oc.icon, 16));
+      tile.marks.add(this.portrait(mx, my, oc, 21));
       for (let k = 0; k < own.level; k++) tile.marks.add(this.art(-tw / 2 + 12 + k * 15, -th / 2 + 12, "🏛️", 18));
     });
 
@@ -393,7 +452,7 @@ class BoardScene extends Phaser.Scene {
       .fillStyle(0xffffff).fillCircle(0, 0, 23)
       .fillStyle(hex(ch.color)).fillCircle(0, 0, 19.5)
       .fillStyle(0xffffff, 0.22).fillCircle(-6, -7, 9);
-    body.add([g, this.art(0, 0, ch.icon, 26)]);
+    body.add([g, this.portrait(0, 0, ch, 40)]);
     const arrow = this.txt(0, -46, "▼", { fontSize: "22px", color: "#ffd34d", stroke: "#4a0f1c", strokeThickness: 4 }).setOrigin(0.5).setVisible(false);
     c.add([shadow, ring, body, arrow]);
     const ringTw = this.tweens.add({ targets: ring, scale: 1.25, alpha: 0.1, duration: 800, repeat: -1, paused: true });

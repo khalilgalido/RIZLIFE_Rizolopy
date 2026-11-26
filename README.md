@@ -21,7 +21,7 @@ npm run build    # writes the single-file game to dist/index.html
 - **GSAP** animates the turn splash, dialogs and menus.
 - **Howler.js** plays sounds. Drop your own files into `src/assets/audio/` (see the README there). Without them, the game uses built-in synthesized sounds and a small 3/4 background tune.
 - **Vite** builds everything into one HTML file.
-- The artwork is Microsoft's Fluent Emoji 3D (MIT). See `LICENSES.md`.
+- **Original art**: the character portraits and the emblem for every place, corner and card are SVGs drawn in code in `tools/art/` (`portraits.mjs`, `emblems.mjs`). Run `npm run art` after editing them to regenerate `src/assets/svg/`. The board itself uses Filipino heritage motifs: a capiz-window centre, a banig-weave frame and "Rizal" in baybayin. Small UI symbols fall back to Fluent Emoji 3D (MIT). See `LICENSES.md`.
 
 ## Files
 
@@ -29,7 +29,8 @@ npm run build    # writes the single-file game to dist/index.html
 - `src/game.js`: rules, turn flow, menus and dialogs.
 - `src/board.js`: the Phaser board scene.
 - `src/fx.js`: sound, music, confetti and floating money text.
-- `src/art.js`: loads the 3D artwork and swaps it in for emoji across the page.
+- `src/art.js`: loads the artwork (original SVGs first, Fluent Emoji 3D as fallback) and swaps it in for emoji across the page.
+- `tools/art/`: source for the original illustrations.
 - `src/style.css`: page styles.
 
 ## Rules (guessed where the design did not say)
