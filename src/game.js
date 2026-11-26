@@ -4,6 +4,7 @@ import { FX } from "./fx.js";
 import { createBoard } from "./board.js";
 import { gsap } from "gsap";
 import { portrait } from "./art.js";
+import { createTutorial, tutorialSeen, markSeen, TUTORIAL_PLAYERS } from "./tutorial.js";
 
 export function boot() {
 
@@ -25,6 +26,24 @@ export function boot() {
   let G = null;          // current game state
   let busy = false;      // true while an animation / modal flow is running
   let board = null;      // Phaser board scene
+
+  // interactive tutorial: a scripted practice game that never touches the real save
+  const tut = createTutorial({
+    getBoard: () => board,
+    onExit: choice => { leaveTutorial(); showScreen(choice === "play" ? "setup" : "landing"); },
+  });
+  function startTutorial() {
+    tut.start();
+    newGame({ players: TUTORIAL_PLAYERS, maxRounds: 0 });
+    G.tutorial = true;
+    enterGame();
+  }
+  function leaveTutorial() {
+    tut.stop();
+    markSeen();
+    if (!$("#modal").classList.contains("hidden")) closeModal();
+    G = null;
+  }
 
   /* =========================================================
      Board rendering
@@ -99,6 +118,7 @@ export function boot() {
   }
 
   function save() {
+    if (tut.active || (G && G.tutorial)) return;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(G)); } catch (e) { /* storage unavailable */ }
   }
   function loadSave() {
@@ -107,6 +127,8 @@ export function boot() {
   function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ } }
 
   function drawFrom(deckName, source) {
+    const forced = tut.forceDraw(deckName);
+    if (forced !== null) return forced;
     if (!G[deckName] || G[deckName].length === 0) G[deckName] = shuffle(source.map((_, i) => i));
     return G[deckName].shift();
   }
@@ -189,11 +211,13 @@ export function boot() {
   }
 
   async function rollDice() {
-    const d1 = 1 + Math.floor(Math.random() * 6);
-    const d2 = 1 + Math.floor(Math.random() * 6);
+    const forced = tut.rollFor(G);
+    const d1 = forced ? forced[0] : 1 + Math.floor(Math.random() * 6);
+    const d2 = forced ? forced[1] : 1 + Math.floor(Math.random() * 6);
     FX.sound.dice();
     await board.rollDice(d1, d2);
     G.lastDice = [d1, d2];
+    tut.emit("rolled", { total: d1 + d2 });
     return [d1, d2];
   }
 
@@ -251,6 +275,7 @@ export function boot() {
       if (G.phase === "end" && !G.msg) G.msg = `${cur().name}, end your turn when ready.`;
       checkLastStanding();
       save(); refresh();
+      tut.emit("rollDone");
     }
   }
 
@@ -293,6 +318,7 @@ export function boot() {
     FX.sound.exile();
     await board.teleport(G, pi, EXILE_INDEX);
     refresh();
+    tut.emit("exiled");
     await alertModal("Exiled to Dapitan 🌴", `<p><b>${esc(p.name)}</b> is sent to Dapitan Exile and does not pass START.</p>
       <p class="fact">On their next turn they can pay ${peso(RULES.exileFee)} or try to roll doubles. After ${RULES.maxExileTurns} failed tries they must pay and move.</p>`);
   }
@@ -312,11 +338,14 @@ export function boot() {
       } else if (own.owner !== pi) {
         const owner = G.players[own.owner];
         const rent = rentFor(i);
+        tut.emit("rent", { amount: rent });
         await alertModal(`Rent due at ${t.name}`, `${deedHtml(i)}<p><b>${esc(p.name)}</b> pays <b>${peso(rent)}</b> rent to <b>${esc(owner.name)}</b>.</p>`, "Pay rent");
         FX.sound.pay();
         const ok = await pay(pi, own.owner, rent);
         log(`${p.name} paid ${peso(rent)} rent to ${owner.name} for ${t.name}.`);
         if (ok) G.msg = `${p.name} paid ${peso(rent)} rent to ${owner.name}.`;
+        refresh();
+        tut.emit("rentPaid");
       } else {
         G.msg = `${p.name} is visiting their own ${t.name}.`;
       }
@@ -337,11 +366,12 @@ export function boot() {
     const p = G.players[pi];
     const t = TILES[i];
     const can = p.money >= t.price;
+    tut.emit("buyOffer", { tile: i });
     const choice = await modal({
       body: `${deedHtml(i)}<p>${can ? `Buy <b>${esc(t.name)}</b> for <b>${peso(t.price)}</b>? You have ${peso(p.money)}.`
         : `You need ${peso(t.price)} but only have ${peso(p.money)}.`}</p>`,
       buttons: [
-        { label: "Skip", value: "skip", cls: "btn-outline" },
+        { label: "Skip", value: "skip", cls: "btn-outline", disabled: tut.active },
         { label: `Buy for ${peso(t.price)}`, value: "buy", cls: "btn-maroon", disabled: !can },
       ],
     });
@@ -352,6 +382,8 @@ export function boot() {
       stampTile(i);
       log(`${p.name} bought ${t.name} for ${peso(t.price)}.`);
       G.msg = `${p.name} bought ${t.name}!`;
+      refresh();
+      tut.emit("bought", { tile: i });
       if (ownsGroup(pi, t.group)) {
         log(`${p.name} now owns all of ${GROUPS[t.group].name}. Rent doubles and landmarks can be built.`);
         toast(`${p.name} completed the ${GROUPS[t.group].name} group!`);
@@ -368,6 +400,7 @@ export function boot() {
     const card = deck[drawFrom(kind + "Deck", deck)];
     await board.drawCardFly(kind);
     FX.sound.card();
+    tut.emit("card", { kind });
     await alertModal(null, `<div class="flip-scene"><div class="flip-card">
         <div class="flip-back ${kind}"><span>${kind === "noli" ? "📖" : "🗡️"}</span><b>${kind.toUpperCase()}</b></div>
         <div class="card-face ${kind}"><div class="ct">${kind === "noli" ? "📖" : "🗡️"} ${kind.toUpperCase()}</div>
@@ -394,6 +427,8 @@ export function boot() {
     if (card.exile) { await sendToExile(pi); return; }
     if (card.moveTo !== undefined) { await moveTo(pi, card.moveTo); await resolveTile(pi); return; }
     if (card.moveBy) { await moveBy(pi, card.moveBy); await resolveTile(pi); }
+    refresh();
+    tut.emit("cardDone");
   }
 
   async function runQuiz(pi) {
@@ -415,6 +450,7 @@ export function boot() {
           setTimeout(() => { closeModal(); resolve(k === q.c); }, 1300);
         });
       });
+      tut.emit("quiz");
     });
     if (correct) {
       p.money += RULES.quizReward;
@@ -425,12 +461,15 @@ export function boot() {
       log(`${p.name} missed the quiz question.`);
       G.msg = `Not quite. The answer was "${q.a[q.c]}".`;
     }
+    refresh();
+    tut.emit("quizDone", { correct });
   }
 
   async function onEndTurn() {
     if (busy || G.phase !== "end") return;
     advanceTurn();
     save(); refresh();
+    tut.emit("turnEnded");
     if (G.phase === "roll") await showSplash();
     await startTurnPrompt();
   }
@@ -455,6 +494,7 @@ export function boot() {
   async function startTurnPrompt() {
     if (G.phase !== "roll") return;
     const p = cur();
+    tut.emit("turnStart", { exile: p.inExile });
     if (!p.inExile) return;
     const buttons = [{ label: "Roll for doubles", value: "roll", cls: "btn-green" }];
     if (p.freeExit > 0) buttons.unshift({ label: "Use Blumentritt's letter", value: "card", cls: "btn-gold" });
@@ -462,6 +502,7 @@ export function boot() {
     const choice = await modal({
       body: `<h2>🌴 ${esc(p.name)} is in Dapitan</h2><p>Pay ${peso(RULES.exileFee)} to leave now, or try to roll doubles (try ${p.exileTries + 1} of ${RULES.maxExileTurns}).</p>`,
       buttons,
+      onOpen: () => tut.emit("exilePrompt"),
     });
     if (choice === "pay") {
       p.money -= RULES.exileFee; p.inExile = false; p.exileTries = 0;
@@ -475,6 +516,7 @@ export function boot() {
       G.msg = `${p.name} needs doubles to leave Dapitan.`;
     }
     save(); refresh();
+    tut.emit("exileChoice", { choice });
   }
 
   function checkLastStanding() {
@@ -644,8 +686,8 @@ export function boot() {
   }
   let lastOverlayClose = 0;
   function closeModal() { $("#modal").classList.add("hidden"); modalResolve = null; lastOverlayClose = Date.now(); }
-  function modal({ body, buttons }) {
-    return new Promise(resolve => { openModal(body, buttons); modalResolve = resolve; });
+  function modal({ body, buttons, onOpen }) {
+    return new Promise(resolve => { openModal(body, buttons); modalResolve = resolve; onOpen && onOpen(); });
   }
   function alertModal(title, html, ok = "Continue") {
     return modal({ body: (title ? `<h2>${esc(title)}</h2>` : "") + html, buttons: [{ label: ok, value: true }] });
@@ -830,14 +872,34 @@ export function boot() {
     const a = e.target.closest("[data-action]");
     if (a) {
       const act = a.dataset.action;
-      if (act === "play") showScreen("setup");
+      if (act === "play") {
+        if (tutorialSeen()) { showScreen("setup"); return; }
+        markSeen();
+        const c = await modal({ body: `<h2>🎓 New to Rizalopoly?</h2><p>A two-minute practice game walks you through rolling, buying, rent, NOLI and FILI cards, Quiz Corner and Dapitan Exile. You can replay it any time from the home page.</p>`,
+          buttons: [{ label: "Skip, set up a game", value: false, cls: "btn-outline" }, { label: "Play the tutorial", value: true }] });
+        if (c) startTutorial(); else showScreen("setup");
+      }
+      else if (act === "tutorial") startTutorial();
       else if (act === "home") showScreen("landing");
-      else if (act === "howto" || act === "rules") alertModal(null, rulesHtml(), "Got it");
+      else if (act === "howto" || act === "rules") {
+        const buttons = [{ label: "Got it", value: false }];
+        if (!tut.active) buttons.unshift({ label: "🎓 Play the tutorial", value: true, cls: "btn-outline" });
+        if (await modal({ body: rulesHtml(), buttons })) {
+          if (act === "howto" || await modal({ body: `<h2>Start the tutorial?</h2><p>Your game is saved and you can resume it from the home page afterwards.</p>`,
+            buttons: [{ label: "Cancel", value: false, cls: "btn-outline" }, { label: "Start tutorial", value: true }] })) startTutorial();
+        }
+      }
       else if (act === "about") alertModal(null, aboutHtml(), "Close");
       else if (act === "start") startFromSetup();
       else if (act === "mute") { FX.setMuted(!FX.isMuted()); updateMute(); }
       else if (act === "music") { FX.setMusic(!FX.isMusicOn()); updateMute(); }
       else if (act === "resume") { G = loadSave(); if (G) enterGame(); }
+      else if (act === "quit" && tut.active) {
+        if (busy) { toast("Wait for the move to finish."); return; }
+        const c = await modal({ body: `<h2>Leave the tutorial?</h2><p>You can play it again any time from the home page.</p>`,
+          buttons: [{ label: "Stay", value: false, cls: "btn-outline" }, { label: "Leave", value: true }] });
+        if (c) { leaveTutorial(); showScreen("landing"); }
+      }
       else if (act === "quit") {
         const c = await modal({ body: `<h2>Leave the game?</h2><p>Your game is saved on this device. You can resume it from the home page.</p>`,
           buttons: [{ label: "Stay", value: false, cls: "btn-outline" }, { label: "Leave", value: true }] });

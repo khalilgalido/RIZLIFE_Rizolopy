@@ -1,0 +1,58 @@
+/* Interactive tutorial: coach bubble and spotlight. Sits above the modal (z 50) and toasts (z 60). */
+.tut-root { display: none; }
+.tut-root.on { display: block; }
+.tut-root.silent .tut-bubble,
+.tut-root.silent .tut-spot,
+.tut-root.silent .tut-dim { display: none !important; }
+
+.tut-dim {
+  position: fixed; inset: 0; z-index: 62; pointer-events: none;
+  background: rgba(30, 15, 5, .45);
+}
+.tut-spot {
+  position: fixed; z-index: 62; pointer-events: none; border-radius: 14px;
+  box-shadow: 0 0 0 200vmax rgba(30, 15, 5, .5), 0 0 0 3px #ffd34d, 0 0 24px 6px rgba(255, 211, 77, .7);
+  transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease;
+}
+.tut-spot.light { box-shadow: 0 0 0 200vmax rgba(30, 15, 5, .15), 0 0 0 3px #ffd34d, 0 0 24px 6px rgba(255, 211, 77, .7); }
+.tut-spot.tap { animation: tut-pulse 1.3s ease-in-out infinite; }
+@keyframes tut-pulse {
+  50% { box-shadow: 0 0 0 200vmax rgba(30, 15, 5, .5), 0 0 0 5px #ffd34d, 0 0 38px 14px rgba(255, 211, 77, .9); }
+}
+.tut-spot.light.tap { animation-name: tut-pulse-light; }
+@keyframes tut-pulse-light {
+  50% { box-shadow: 0 0 0 200vmax rgba(30, 15, 5, .15), 0 0 0 5px #ffd34d, 0 0 38px 14px rgba(255, 211, 77, .9); }
+}
+
+.tut-bubble {
+  position: fixed; left: 0; top: 0; z-index: 64;
+  background: var(--cream, #f8ecd4); color: var(--ink, #2b1d14);
+  border: 3px solid var(--gold, #b8913a); border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+  padding: 14px 16px 12px; font-size: .98rem; line-height: 1.45;
+  transition: transform .25s ease;
+}
+.tut-bubble.pop { animation: tut-pop .35s cubic-bezier(.2, 1.4, .4, 1); }
+@keyframes tut-pop { from { opacity: 0; scale: .9; } }
+.tut-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.tut-coach {
+  display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%;
+  background: var(--maroon, #6e1a2c); border: 2px solid var(--gold, #b8913a); font-size: 1.1rem;
+}
+.tut-title { font-family: var(--serif, Georgia, serif); font-weight: 900; font-size: 1.15rem; color: var(--maroon, #6e1a2c); flex: 1; }
+.tut-count { font-size: .78rem; font-weight: 700; color: var(--muted, #6b5a45); white-space: nowrap; }
+.tut-text ul { margin: 6px 0 0; padding-left: 1.2em; }
+.tut-text li { margin-bottom: .2em; }
+.tut-buttons { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.tut-buttons .btn:only-child, .tut-buttons .btn-maroon:last-child { margin-left: auto; }
+.tut-skip { padding-left: 0; font-size: .9rem; }
+.tut-hint { font-size: .88rem; font-weight: 700; color: var(--green, #1e4d3a); }
+
+@media (max-width: 600px) {
+  .tut-bubble { font-size: .92rem; padding: 12px 14px 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tut-spot, .tut-bubble { transition: none; }
+  .tut-spot.tap, .tut-bubble.pop { animation: none; }
+}
+.tut-root.under .tut-dim, .tut-root.under .tut-spot, .tut-root.under .tut-bubble { z-index: 45; }
