@@ -4,6 +4,7 @@ import { FX } from "./fx.js";
 import { createBoard } from "./board.js";
 import { gsap } from "gsap";
 import { portrait } from "./art.js";
+import * as AI from "./ai.js";
 
 export function boot() {
 
@@ -93,6 +94,47 @@ export function boot() {
   function activePlayers() { return G.players.filter(p => !p.bankrupt); }
   function cur() { return G.players[G.turn]; }
 
+  /* =========================================================
+     Computer opponents: decisions live in ai.js, this drives the turn
+     ========================================================= */
+  let aiGen = 0;          // bumped when a game is entered or left, which stops a running CPU loop
+  let aiRunning = false;
+  const aiCtx = () => ({ G, rentFor, ownsGroup, upgradeCost, propsOf, groupTiles });
+  const gameVisible = () => $("#game").classList.contains("active");
+  /** true while the player to move is a CPU */
+  function aiSeat() { return !!G && G.phase !== "over" && AI.isAI(cur()); }
+  function aiBanner(p, deciding) {
+    return `<div class="ai-banner">🤖 ${esc(p.name)} ${deciding ? "is deciding" : "is playing"}<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>`;
+  }
+
+  /** Plays CPU turns one step at a time with pauses, until a human is up. */
+  async function aiDrive() {
+    if (aiRunning) return;
+    aiRunning = true;
+    const gen = aiGen;
+    const alive = () => gen === aiGen && aiSeat() && gameVisible();
+    try {
+      while (alive()) {
+        if (busy || !$("#modal").classList.contains("hidden") || !$("#splash").classList.contains("hidden")) { await sleep(150); continue; }
+        if (G.phase === "roll") {
+          G.msg = `🤖 ${cur().name} is about to roll…`; refresh();
+          await sleep(AI.pause(G, "think"));
+          if (!alive()) break;
+          await onRoll(true);
+        } else if (G.phase === "end") {
+          for (const i of AI.decideBuilds(aiCtx(), G.turn)) {
+            if (!alive()) break;
+            await sleep(AI.pause(G, "build"));
+            build(i, true);
+          }
+          await sleep(AI.pause(G, "end"));
+          if (!alive()) break;
+          await onEndTurn(true);
+        } else break;
+      }
+    } finally { aiRunning = false; }
+  }
+
   function log(msg) {
     G.log.push(msg);
     if (G.log.length > 200) G.log.shift();
@@ -170,8 +212,9 @@ export function boot() {
     G = {
       players: setup.players.map(s => ({
         name: s.name, char: s.char, money: RULES.startMoney, pos: 0,
-        inExile: false, exileTries: 0, freeExit: 0, bankrupt: false,
+        inExile: false, exileTries: 0, freeExit: 0, bankrupt: false, ai: s.ai || null,
       })),
+      aiSpeed: setup.aiSpeed || "normal",
       owned: {},
       turn: 0,
       round: 1,
@@ -197,8 +240,9 @@ export function boot() {
     return [d1, d2];
   }
 
-  async function onRoll() {
+  async function onRoll(fromAI) {
     if (busy || G.phase !== "roll") return;
+    if (!fromAI && aiSeat()) return;
     busy = true; refresh();
     try {
       const p = cur();
@@ -344,6 +388,7 @@ export function boot() {
         { label: "Skip", value: "skip", cls: "btn-outline" },
         { label: `Buy for ${peso(t.price)}`, value: "buy", cls: "btn-maroon", disabled: !can },
       ],
+      ai: AI.isAI(p) ? AI.decideBuy(aiCtx(), pi, i) : undefined,
     });
     if (choice === "buy") {
       p.money -= t.price;
@@ -415,6 +460,16 @@ export function boot() {
           setTimeout(() => { closeModal(); resolve(k === q.c); }, 1300);
         });
       });
+      if (AI.isAI(p)) {
+        const pick = AI.decideQuiz(p, q);
+        const opts = $("#modalBody").querySelector(".quiz-opts");
+        const btn = opts.querySelector(`button[data-k="${pick}"]`);
+        opts.style.pointerEvents = "none";
+        $("#modalBody").insertAdjacentHTML("afterbegin", aiBanner(p, true));
+        const wait = gameVisible() ? AI.pause(G, "quiz") : 0;
+        setTimeout(() => btn.classList.add("ai-pick"), wait * 0.6);
+        setTimeout(() => btn.click(), wait);
+      }
     });
     if (correct) {
       p.money += RULES.quizReward;
@@ -427,12 +482,14 @@ export function boot() {
     }
   }
 
-  async function onEndTurn() {
+  async function onEndTurn(fromAI) {
     if (busy || G.phase !== "end") return;
+    if (!fromAI && aiSeat()) return;
     advanceTurn();
     save(); refresh();
     if (G.phase === "roll") await showSplash();
     await startTurnPrompt();
+    aiDrive();
   }
 
   function advanceTurn() {
@@ -462,6 +519,7 @@ export function boot() {
     const choice = await modal({
       body: `<h2>🌴 ${esc(p.name)} is in Dapitan</h2><p>Pay ${peso(RULES.exileFee)} to leave now, or try to roll doubles (try ${p.exileTries + 1} of ${RULES.maxExileTurns}).</p>`,
       buttons,
+      ai: AI.isAI(p) ? AI.decideExile(aiCtx(), G.turn) : undefined,
     });
     if (choice === "pay") {
       p.money -= RULES.exileFee; p.inExile = false; p.exileTries = 0;
@@ -515,8 +573,9 @@ export function boot() {
   /* =========================================================
      Building landmarks
      ========================================================= */
-  async function build(i) {
+  async function build(i, fromAI) {
     if (busy || G.phase === "over") return;
+    if (!fromAI && aiSeat()) return;
     const p = cur();
     const own = G.owned[i];
     if (!own || own.owner !== G.turn || !ownsGroup(G.turn, TILES[i].group) || own.level >= RULES.maxUpgrades) return;
@@ -537,7 +596,7 @@ export function boot() {
   function refresh() {
     if (!G) return;
     const p = cur();
-    if (board) board.sync(G, { busy, msg: G.msg });
+    if (board) board.sync(G, { busy: busy || aiSeat(), msg: G.msg });
     $("#roundInfo").textContent = G.maxRounds ? `Round ${G.round} of ${G.maxRounds}` : `Round ${G.round}`;
 
     $("#playerList").innerHTML = G.players.map((pl, i) => {
@@ -545,7 +604,7 @@ export function boot() {
       const tags = pl.bankrupt ? `<span class="tag">💀 Bankrupt</span>` : [
         pl.inExile ? `<span class="tag">🌴 Exiled</span>` : "",
         pl.freeExit ? `<span class="tag">✉️ Letter</span>` : "",
-      ].join("");
+      ].join("") + AI.badgeHtml(pl);
       const swatches = propsOf(i).map(t => `<i style="background:${GROUPS[TILES[t].group].color}" title="${esc(TILES[t].name)}"></i>`).join("");
       return `<div class="p-row ${i === G.turn && G.phase !== "over" ? "current" : ""} ${pl.bankrupt ? "out" : ""}" style="--c:${ch.color}" data-prow="${i}">
         <div class="avatar" style="background:${ch.color}">${portrait(ch)}</div>
@@ -568,7 +627,7 @@ export function boot() {
     $("#myProps").innerHTML = mine.length === 0 ? `<p class="muted" style="margin:0">${esc(p.name)} owns no places yet.</p>`
       : mine.map(i => {
         const t = TILES[i], own = G.owned[i];
-        const canBuild = ownsGroup(G.turn, t.group) && own.level < RULES.maxUpgrades && G.phase !== "over" && !busy;
+        const canBuild = ownsGroup(G.turn, t.group) && own.level < RULES.maxUpgrades && G.phase !== "over" && !busy && !AI.isAI(p);
         return `<div class="prop-row"><span class="sw" style="background:${GROUPS[t.group].color}"></span>
           <span class="nm">${t.icon} ${esc(t.name)} ${"🏛".repeat(own.level)}</span>
           <span class="muted">rent ${peso(rentFor(i))}</span>
@@ -597,7 +656,8 @@ export function boot() {
       <div class="avatar splash-avatar" style="background:${c.color}">${portrait(c)}</div>
       <div class="splash-name">${esc(p.name)}</div>
       <div class="splash-char">${esc(c.name)}</div>
-      <div class="splash-hint">${p.inExile ? "🌴 You are in Dapitan Exile" : "Pass the device · tap to start your turn"}</div></div>`;
+      <div class="splash-hint">${AI.isAI(p) ? `🤖 Computer player · ${AI.AI_LEVELS[p.ai].label}${p.inExile ? " · in Dapitan" : ""}`
+        : p.inExile ? "🌴 You are in Dapitan Exile" : "Pass the device · tap to start your turn"}</div></div>`;
     sp.classList.remove("hidden");
     FX.sound.turn();
     const tl = gsap.timeline();
@@ -613,7 +673,7 @@ export function boot() {
         gsap.to(sp, { opacity: 0, duration: 0.25, onComplete: () => { sp.classList.add("hidden"); sp.style.opacity = ""; resolve(); } });
       };
       sp.onclick = close;
-      setTimeout(close, 2000);
+      setTimeout(close, AI.isAI(p) ? AI.pause(G, "splash") : 2000);
     });
   }
 
@@ -644,11 +704,32 @@ export function boot() {
   }
   let lastOverlayClose = 0;
   function closeModal() { $("#modal").classList.add("hidden"); modalResolve = null; lastOverlayClose = Date.now(); }
-  function modal({ body, buttons }) {
-    return new Promise(resolve => { openModal(body, buttons); modalResolve = resolve; });
+  /**
+   * Shows a dialog and resolves with the chosen button's value.
+   * On a CPU's turn (unless `human` is set) the dialog plays itself: it shows which
+   * button the CPU picks (`ai`, or the last button for plain notices) and presses it after a pause.
+   */
+  function modal({ body, buttons, ai, human }) {
+    const auto = !human && aiSeat();
+    if (!auto) return new Promise(resolve => { openModal(body, buttons); modalResolve = resolve; });
+    const idx = ai === undefined ? buttons.length - 1 : buttons.findIndex(b => b.value === ai);
+    const pick = buttons[idx].value;
+    if (!gameVisible()) return Promise.resolve(pick); // the game was left mid-turn
+    return (async () => {
+      while (!$("#modal").classList.contains("hidden")) await sleep(120); // one dialog at a time
+      return new Promise(resolve => {
+        openModal(aiBanner(cur(), ai !== undefined) + body, buttons.map((b, k) => ({ ...b, disabled: b.disabled || k !== idx })));
+        modalResolve = resolve;
+        const btn = $("#modalButtons").children[idx];
+        btn.classList.add(...(ai !== undefined ? [] : ["ai-pick"]));
+        const wait = AI.pause(G, "modal");
+        if (ai !== undefined) setTimeout(() => btn.classList.add("ai-pick"), wait * 0.5);
+        setTimeout(() => { if (modalResolve === resolve) { closeModal(); resolve(pick); } }, wait);
+      });
+    })();
   }
-  function alertModal(title, html, ok = "Continue") {
-    return modal({ body: (title ? `<h2>${esc(title)}</h2>` : "") + html, buttons: [{ label: ok, value: true }] });
+  function alertModal(title, html, ok = "Continue", opts = {}) {
+    return modal({ body: (title ? `<h2>${esc(title)}</h2>` : "") + html, buttons: [{ label: ok, value: true }], ...opts });
   }
   function toast(msg) {
     const el = document.createElement("div");
@@ -686,7 +767,7 @@ export function boot() {
     else if (t.type === "noli") html = `<h2>📖 NOLI card</h2><p>Draw a card inspired by <i>Noli Me Tangere</i> (1887).</p>`;
     else if (t.type === "fili") html = `<h2>🗡️ FILI card</h2><p>Draw a card inspired by <i>El Filibusterismo</i> (1891).</p>`;
     else html = `<h2>${t.icon} ${esc(t.name)}</h2><p>${esc(t.note)}</p>`;
-    modal({ body: html, buttons: [{ label: "Close", value: 0, cls: "btn-outline" }] });
+    modal({ body: html, buttons: [{ label: "Close", value: 0, cls: "btn-outline" }], human: true });
   }
 
   function rulesHtml() {
@@ -742,8 +823,17 @@ export function boot() {
   const setup = {
     count: 2,
     maxRounds: 20,
-    slots: Array.from({ length: 6 }, (_, i) => ({ name: `Player ${i + 1}`, char: CHARACTERS[i].id })),
+    aiSpeed: "normal",
+    slots: Array.from({ length: 6 }, (_, i) => ({ name: `Player ${i + 1}`, char: CHARACTERS[i].id, ai: null })),
   };
+
+  /* CPU seats get an automatic name that follows their character, until someone types a name. */
+  const autoNamed = (s, idx) => s.name === `Player ${idx + 1}` || /\(CPU\)$/.test(s.name) || !s.name.trim();
+  function renameSeat(idx) {
+    const s = setup.slots[idx];
+    if (!autoNamed(s, idx)) return;
+    s.name = s.ai ? AI.cpuName(s.char) : `Player ${idx + 1}`;
+  }
 
   function dedupeChars() {
     const used = new Set();
@@ -766,10 +856,26 @@ export function boot() {
       setup.maxRounds = Number(b.dataset.r); renderSetup();
     }));
 
+    // computer speed row, only when a CPU is seated
+    let speedRow = $("#aiSpeedRow");
+    if (!speedRow) {
+      speedRow = document.createElement("div");
+      speedRow.className = "setup-row";
+      speedRow.id = "aiSpeedRow";
+      speedRow.innerHTML = `<label>Computer speed</label><div class="seg" id="aiSpeed"></div>`;
+      $("#roundLimit").closest(".setup-row").after(speedRow);
+    }
+    speedRow.classList.toggle("hidden", !setup.slots.slice(0, setup.count).some(s => s.ai));
+    $("#aiSpeed").innerHTML = AI.speedPickerHtml(setup.aiSpeed);
+    $("#aiSpeed").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      setup.aiSpeed = b.dataset.aispeed; renderSetup();
+    }));
+
     const slots = setup.slots.slice(0, setup.count);
     $("#playerSlots").innerHTML = slots.map((s, idx) => {
       const c = charById(s.char);
-      return `<div class="slot">
+      return `<div class="slot ${s.ai ? "is-cpu" : ""}">
+        ${AI.seatPickerHtml(s, idx)}
         <div class="slot-top">
           <div class="avatar" style="background:${c.color};width:44px;height:44px;font-size:1.4rem;margin:0;border-width:2px">${portrait(c)}</div>
           <input type="text" maxlength="16" value="${esc(s.name)}" data-slot="${idx}" aria-label="Player ${idx + 1} name">
@@ -786,13 +892,23 @@ export function boot() {
       setup.slots[Number(inp.dataset.slot)].name = inp.value;
     }));
     $("#playerSlots").querySelectorAll(".mini-char").forEach(b => b.addEventListener("click", () => {
-      setup.slots[Number(b.dataset.slot)].char = b.dataset.char; renderSetup();
+      const idx = Number(b.dataset.slot);
+      const wasAuto = autoNamed(setup.slots[idx], idx);
+      setup.slots[idx].char = b.dataset.char;
+      if (wasAuto) renameSeat(idx);
+      renderSetup();
+    }));
+    $("#playerSlots").querySelectorAll("[data-seat]").forEach(b => b.addEventListener("click", () => {
+      const idx = Number(b.dataset.seat);
+      setup.slots[idx].ai = b.dataset.ai || null;
+      renameSeat(idx);
+      renderSetup();
     }));
     $("#setupError").textContent = "";
   }
 
   function startFromSetup() {
-    const players = setup.slots.slice(0, setup.count).map((s, i) => ({ name: s.name.trim() || `Player ${i + 1}`, char: s.char }));
+    const players = setup.slots.slice(0, setup.count).map((s, i) => ({ name: s.name.trim() || `Player ${i + 1}`, char: s.char, ai: s.ai }));
     const names = players.map(p => p.name.toLowerCase());
     if (new Set(names).size !== names.length) { $("#setupError").textContent = "Each player needs a different name."; return; }
     newGame({ players, maxRounds: setup.maxRounds });
@@ -801,6 +917,7 @@ export function boot() {
 
   async function enterGame() {
     busy = false;
+    aiGen++;
     showScreen("game");
     if (!board) {
       // ignore canvas taps while a dialog is open or right after one closes (the same tap can reach the canvas)
@@ -820,7 +937,7 @@ export function boot() {
     lastMoney = null;
     refresh();
     FX.startMusic();
-    (G.phase === "roll" ? showSplash() : Promise.resolve()).then(startTurnPrompt);
+    (G.phase === "roll" ? showSplash() : Promise.resolve()).then(startTurnPrompt).then(() => aiDrive());
   }
 
   /* =========================================================
@@ -832,16 +949,16 @@ export function boot() {
       const act = a.dataset.action;
       if (act === "play") showScreen("setup");
       else if (act === "home") showScreen("landing");
-      else if (act === "howto" || act === "rules") alertModal(null, rulesHtml(), "Got it");
-      else if (act === "about") alertModal(null, aboutHtml(), "Close");
+      else if (act === "howto" || act === "rules") alertModal(null, rulesHtml(), "Got it", { human: true });
+      else if (act === "about") alertModal(null, aboutHtml(), "Close", { human: true });
       else if (act === "start") startFromSetup();
       else if (act === "mute") { FX.setMuted(!FX.isMuted()); updateMute(); }
       else if (act === "music") { FX.setMusic(!FX.isMusicOn()); updateMute(); }
       else if (act === "resume") { G = loadSave(); if (G) enterGame(); }
       else if (act === "quit") {
         const c = await modal({ body: `<h2>Leave the game?</h2><p>Your game is saved on this device. You can resume it from the home page.</p>`,
-          buttons: [{ label: "Stay", value: false, cls: "btn-outline" }, { label: "Leave", value: true }] });
-        if (c) showScreen("landing");
+          buttons: [{ label: "Stay", value: false, cls: "btn-outline" }, { label: "Leave", value: true }], human: true });
+        if (c) { aiGen++; showScreen("landing"); }
       }
       return;
     }
@@ -851,6 +968,7 @@ export function boot() {
   document.addEventListener("keydown", e => {
     if (!$("#modal").classList.contains("hidden") || !$("#splash").classList.contains("hidden")) return;
     if (!$("#game").classList.contains("active") || e.target.tagName === "INPUT") return;
+    if (aiSeat()) return;
     if (e.key === " " || e.key === "Enter") {
       e.preventDefault();
       if (G.phase === "roll") onRoll(); else if (G.phase === "end") onEndTurn();

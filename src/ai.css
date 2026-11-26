@@ -1,0 +1,31 @@
+/* Computer opponent styles (kept apart from style.css so art changes do not collide). */
+
+.seat-type { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.seat-type button {
+  flex: 1 1 auto; border: 2px solid var(--gold-light); background: #fff; border-radius: 8px;
+  padding: .3em .5em; font-size: .82rem; font-weight: 700; color: var(--ink); cursor: pointer;
+}
+.seat-type button.on { background: var(--green); border-color: var(--green); color: #fff; }
+.slot.is-cpu { background: linear-gradient(180deg, #eef5ef, #fff8e8); border-color: #9cc3a8; }
+
+.ai-tag { background: #1e4d3a !important; color: #fff !important; }
+
+/* banner at the top of a dialog while a CPU is deciding */
+.ai-banner {
+  display: flex; align-items: center; gap: 8px; margin: -6px 0 10px;
+  padding: 6px 12px; border-radius: 999px; background: #1e4d3a; color: #fff;
+  font-weight: 700; font-size: .9rem; width: fit-content;
+}
+.ai-banner .dots span { display: inline-block; animation: ai-dot 1s infinite; }
+.ai-banner .dots span:nth-child(2) { animation-delay: .15s; }
+.ai-banner .dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes ai-dot { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
+/* the button a CPU is about to press */
+.btn.ai-pick, .quiz-opts button.ai-pick {
+  outline: 3px solid #ffd34d; outline-offset: 2px;
+  animation: ai-pulse .6s ease-in-out infinite alternate;
+}
+@keyframes ai-pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+
+.ai-skip-hint { font-size: .78rem; color: var(--muted); margin: 6px 0 0; text-align: right; }
