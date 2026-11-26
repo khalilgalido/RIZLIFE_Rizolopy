@@ -25,6 +25,7 @@
           <button class="btn btn-outline" data-action="tutorial">🎓 Tutorial</button>
         </div>
         <button class="btn btn-link hidden" id="resumeBtn" data-action="resume">↻ Resume saved game</button>
+        <button class="completed-badge hidden" id="completedBadge" type="button" aria-label="Completed a game. View certificates"></button>
       </div>
       <div class="hero-board">
         <div class="board" id="previewBoard">
@@ -80,6 +81,26 @@
       <h2>Play Online</h2>
       <p class="muted">Everyone plays on their own phone. One person hosts and shares a 4-letter room code.</p>
       <div id="onlineBody"></div>
+    </div>
+  </main>
+
+  <!-- ============ CERTIFICATE ============ -->
+  <main id="certificate" class="screen">
+    <div class="cert-wrap">
+      <div class="cert-head">
+        <button class="btn btn-link" data-cert="back" id="certBack">← Home</button>
+        <h2 id="certTitle">Your certificate</h2>
+      </div>
+      <div class="cert-tabs" id="certTabs"></div>
+      <div class="cert-paper">
+        <img id="certImg" alt="Certificate of completion">
+        <div class="cert-loading" id="certLoading">Preparing your certificate…</div>
+      </div>
+      <div class="cert-actions">
+        <button class="btn btn-gold" data-cert="download">⬇ Download</button>
+        <button class="btn btn-maroon" data-cert="print">🖨 Print</button>
+      </div>
+      <p class="muted cert-note">Saved on this device. Open it again any time from the <b>Completed</b> badge on the home screen.</p>
     </div>
   </main>
 

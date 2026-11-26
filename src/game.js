@@ -7,6 +7,7 @@ import { portrait, portraitUrl } from "./art.js";
 import * as AI from "./ai.js";
 import { createTutorial, tutorialSeen, markSeen, TUTORIAL_PLAYERS } from "./tutorial.js";
 import { initOnline } from "./online.js";
+import { initCertificates, newStats } from "./certificate.js";
 
 export function boot() {
 
@@ -156,6 +157,14 @@ export function boot() {
     } finally { aiRunning = false; }
   }
 
+  /** per-player tallies shown on the completion certificate (older saves have none yet) */
+  function stat(pi, key, n) {
+    const p = G && G.players[pi];
+    if (!p || G.tutorial) return;
+    p.stats = p.stats || newStats();
+    p.stats[key] = (p.stats[key] || 0) + n;
+  }
+
   function log(msg) {
     G.log.push(msg);
     if (G.log.length > 200) G.log.shift();
@@ -237,7 +246,10 @@ export function boot() {
       players: setup.players.map(s => ({
         name: s.name, char: s.char, money: RULES.startMoney, pos: 0,
         inExile: false, exileTries: 0, freeExit: 0, bankrupt: false, ai: s.ai || null,
+        stats: newStats(),
       })),
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      startedAt: Date.now(),
       aiSpeed: setup.aiSpeed || "normal",
       owned: {},
       turn: 0,
@@ -392,6 +404,7 @@ export function boot() {
         sfx("pay");
         const ok = await pay(pi, own.owner, rent);
         log(`${p.name} paid ${peso(rent)} rent to ${owner.name} for ${t.name}.`);
+        if (ok) { stat(pi, "rentPaid", rent); stat(own.owner, "rentEarned", rent); }
         if (ok) G.msg = `${p.name} paid ${peso(rent)} rent to ${owner.name}.`;
         refresh();
         tut.emit("rentPaid");
@@ -428,6 +441,7 @@ export function boot() {
     if (choice === "buy") {
       p.money -= t.price;
       G.owned[i] = { owner: pi, level: 0 };
+      stat(pi, "bought", 1);
       sfx("coin");
       stampTile(i);
       log(`${p.name} bought ${t.name} for ${peso(t.price)}.`);
@@ -458,6 +472,7 @@ export function boot() {
           <p class="cx">${esc(card.text)}</p></div>
       </div></div><p class="fact">📜 ${esc(card.fact)}</p>`, "OK");
     log(`${p.name} drew ${kind.toUpperCase()}: ${card.text}`);
+    stat(pi, "cards", 1);
     G.msg = card.text;
 
     if (card.money > 0) { p.money += card.money; }
@@ -494,6 +509,8 @@ export function boot() {
       ai: AI.isAI(p) ? AI.decideQuiz(p, q) : undefined, onOpen: () => tut.emit("quiz"),
     }));
     const correct = k === q.c;
+    stat(pi, "quizAsked", 1);
+    if (correct) stat(pi, "quizRight", 1);
     revealQuiz(k, q.c);
     emit("quizReveal", { k, c: q.c });
     sfx(correct ? "right" : "wrong");
@@ -585,8 +602,43 @@ export function boot() {
     emit("bigConfetti");
     confetti(240);
     G.msg = `🏆 ${winner.name} wins!`;
+    G.endedAt = Date.now();
+    G.endReason = reason;
     save(); refresh();
+    earnCertificates();
     showWinner(reason, ranking);
+  }
+
+  /** seats whose person is on this screen: every human seat on a shared device, or your own seat online */
+  function mySeats() {
+    if (!G || G.tutorial) return [];
+    if (NET) return NET.mySeat >= 0 && !AI.isAI(G.players[NET.mySeat]) ? [NET.mySeat] : [];
+    return G.players.map((p, i) => i).filter(i => !AI.isAI(G.players[i]));
+  }
+  /** a finished game (not a quit) earns each person on this screen a certificate, kept on this device */
+  function earnCertificates() {
+    if (!G || G.phase !== "over" || G.tutorial) return [];
+    const ranking = G.players.map((p, i) => ({ i, worth: p.bankrupt ? -1 : netWorth(i) })).sort((a, b) => b.worth - a.worth);
+    const mode = NET ? "online" : G.players.some(p => AI.isAI(p)) ? "cpu" : "hotseat";
+    return mySeats().map(seat => certs.record({
+      gameId: G.id || (G.id = "g" + (G.endedAt || Date.now()).toString(36)),
+      seat,
+      name: G.players[seat].name,
+      char: G.players[seat].char,
+      place: ranking.findIndex(r => r.i === seat) + 1,
+      of: G.players.length,
+      bankrupt: !!G.players[seat].bankrupt,
+      worth: Math.max(0, netWorth(seat)),
+      cash: G.players[seat].money,
+      places: propsOf(seat).length,
+      landmarks: propsOf(seat).reduce((n, i) => n + G.owned[i].level, 0),
+      rounds: G.round,
+      mode,
+      winner: G.players[ranking[0].i].name,
+      opponents: G.players.filter((p, i) => i !== seat).map(p => p.name),
+      stats: G.players[seat].stats || newStats(),
+      date: G.endedAt || Date.now(),
+    }));
   }
 
   async function showWinner(reason, ranking) {
@@ -597,13 +649,16 @@ export function boot() {
         <h2>🏆 ${esc(w.name)} wins!</h2><p class="muted">${esc(reason)} The wealthiest player builds the greatest legacy.</p></div>
         <ul class="winner-list">${ranking.map(r => `<li><span>${portrait(charById(r.p.char))} ${esc(r.p.name)}</span><span>${r.p.bankrupt ? "Bankrupt" : peso(r.worth)}</span></li>`).join("")}</ul>
         <p class="fact">Net worth counts cash plus the price of every place and landmark owned.</p>`,
-      buttons: NET ? [{ label: "View board", value: "stay", cls: "btn-outline" }] : [
+      buttons: [
         { label: "View board", value: "stay", cls: "btn-outline" },
-        { label: "Play again", value: "again", cls: "btn-maroon" },
+        ...(NET ? [] : [{ label: "Play again", value: "again", cls: "btn-outline" }]),
+        { label: "🎓 Get your certificate", value: "cert", cls: "btn-gold" },
       ],
       decider: NET ? "all" : undefined,
+      human: true,
     });
     if (choice === "again") { clearSave(); showScreen("setup"); }
+    else if (choice === "cert") openMyCertificates();
   }
 
   /* =========================================================
@@ -619,6 +674,7 @@ export function boot() {
     if (p.money < cost) { toast(`You need ${peso(cost)} to build here.`); return; }
     p.money -= cost;
     own.level++;
+    stat(G.turn, "landmarks", 1);
     sfx("build");
     stampTile(i);
     log(`${p.name} built a landmark on ${TILES[i].name} for ${peso(cost)}. Rent is now ${peso(rentFor(i))}.`);
@@ -786,12 +842,39 @@ export function boot() {
         onOpen && onOpen();
       });
     }
+    const d = decider === undefined ? G.turn : decider;
+    const cpu = !human && d === G.turn && aiSeat();
+    if (cpu) body = aiBanner(cur(), ai !== undefined) + body;
     return new Promise(resolve => {
       const mid = ++modalSeq;
-      netModal = { mid, body, buttons, decider: decider === undefined ? G.turn : decider, keepOpen, resolve };
+      netModal = { mid, body, buttons, decider: d, keepOpen, resolve, cpu };
       emit("modal", { mid, body: packHtml(body), buttons, decider: netModal.decider });
       showNetModal();
+      if (cpu) netCpuAnswer(netModal, ai);
     });
+  }
+  /**
+   * Online, a CPU seat answers its own dialogs on the host's screen: everyone sees the dialog,
+   * the CPU's pick lights up, then the host presses it after the usual pause.
+   */
+  function netCpuAnswer(m, ai) {
+    const choice = m.buttons.length === 0;
+    const idx = choice ? -1 : ai === undefined ? m.buttons.length - 1 : m.buttons.findIndex(b => b.value === ai);
+    const pick = choice ? ai : m.buttons[Math.max(0, idx)].value;
+    const wait = AI.pause(G, choice ? "quiz" : "modal");
+    const mark = () => {
+      if (netModal !== m) return;
+      const btn = choice ? $("#modalBody").querySelector(`[data-choice="${pick}"]`) : $("#modalButtons").children[idx];
+      btn && btn.classList.add("ai-pick");
+      emit("aiPick", { mid: m.mid, choice, idx, pick });
+    };
+    setTimeout(mark, ai !== undefined ? wait * 0.5 : 0);
+    const go = () => {
+      if (netModal !== m || m.answered) return;
+      if (!gameVisible()) { setTimeout(go, 400); return; } // host looking at rules or a certificate: wait
+      resolveNetModal(m.mid, pick);
+    };
+    setTimeout(go, wait);
   }
   /**
    * On a CPU's turn (offline only) the dialog plays itself: it shows which button the CPU picks
@@ -825,10 +908,10 @@ export function boot() {
     const m = netModal;
     if (!m || m.answered) return;
     const who = typeof m.decider === "number" ? G.players[m.decider] : null;
-    const mine = !who || hostControls(m.decider);
+    const mine = !m.cpu && (!who || hostControls(m.decider));
     openModal(m.body, m.buttons, {
       locked: !mine,
-      waiting: !mine ? `⏳ Waiting for ${esc(who.name)}…` : (who && who.cid !== NET.cid ? `📴 ${esc(who.name)} is offline, so you choose for them.` : ""),
+      waiting: m.cpu ? "" : !mine ? `⏳ Waiting for ${esc(who.name)}…` : (who && who.cid !== NET.cid ? `📴 ${esc(who.name)} is offline, so you choose for them.` : ""),
       onPick: v => resolveNetModal(m.mid, v),
     });
   }
@@ -937,6 +1020,7 @@ export function boot() {
       const s = loadSave();
       $("#resumeBtn").classList.toggle("hidden", !hasResumable());
       $("#resumeBtn").textContent = s && s.online ? `↻ Re-open online room ${s.online.code}` : "↻ Resume saved game";
+      certs.renderBadge();
     }
   }
 
@@ -1122,7 +1206,7 @@ export function boot() {
   }
 
   function requestAct(a, i) {
-    if (!G || G.phase === "over" || busy) return;
+    if (!G || !board || G.phase === "over" || busy) return; // the board may still be loading
     if (a === "roll" && G.phase !== "roll") return;
     if (a === "end" && G.phase !== "end") return;
     if (!canAct()) { if (NET) toast(`It's ${cur().name}'s turn.`); return; }
@@ -1151,7 +1235,7 @@ export function boot() {
 
   function hostResume(room, hostCid) {
     NET = { role: "host", room, cid: hostCid, mySeat: seatOfCid(hostCid) };
-    G.players.forEach(p => { if (p.cid && p.cid !== hostCid) p.offline = true; });
+    G.players.forEach(p => { if (p.cid && p.cid !== hostCid && !AI.isAI(p)) p.offline = true; });
     emit("start");
     enterGame();
     toast(`Room ${room.code} is open again. Players can rejoin with the same code.`);
@@ -1211,9 +1295,9 @@ export function boot() {
     const mine = m.decider === "all" || m.decider === NET.mySeat;
     openModal(unpackHtml(m.body), m.buttons, {
       locked: !mine || m.answered,
-      waiting: mine ? "" : `⏳ Waiting for ${esc(who ? who.name : "the host")}…`,
+      waiting: mine || AI.isAI(who) ? "" : `⏳ Waiting for ${esc(who ? who.name : "the host")}…`,
       onPick: v => {
-        if (m.decider === "all") { closeModal(); guestMid = null; return; }
+        if (m.decider === "all") { closeModal(); guestMid = null; if (v === "cert") openMyCertificates(); return; }
         m.answered = true;
         lockModal();
         NET.room.send({ t: "answer", mid: m.mid, value: v });
@@ -1233,10 +1317,12 @@ export function boot() {
     setBanner(null);
     if (m.t === "state") {
       const first = !G;
+      const wasOver = !!G && G.phase === "over";
       G = m.G; busy = m.busy;
       NET.mySeat = seatOfCid(NET.cid);
-      if (first || !$("#game").classList.contains("active")) await enterGame();
+      if (first || (!$("#game").classList.contains("active") && !certs.showing())) await enterGame();
       else refresh();
+      if (G.phase === "over" && !wasOver) earnCertificates();
       return;
     }
     if (!G || !board) return;
@@ -1256,6 +1342,12 @@ export function boot() {
       case "modal": guestMid = m.mid; guestModalMsg = m; showGuestModal(m); break;
       case "modalClose": if (guestMid !== null) { guestMid = null; closeModal(); } break;
       case "quizReveal": revealQuiz(m.k, m.c); break;
+      case "aiPick": {
+        if (guestMid !== m.mid) break;
+        const btn = m.choice ? $("#modalBody").querySelector(`[data-choice="${m.pick}"]`) : $("#modalButtons").children[m.idx];
+        btn && btn.classList.add("ai-pick");
+        break;
+      }
     }
   }
 
@@ -1266,6 +1358,20 @@ export function boot() {
     NET = null; netModal = null; busy = false; guestMid = null; guestModalMsg = null;
     if (wasGuest) G = null;
     setBanner(null);
+  }
+
+  const certs = initCertificates({
+    showScreen,
+    hasBoard: () => !!G && !!board,
+    back: () => { showScreen("game"); refresh(); },
+  });
+  /** show this screen's certificates for the game that just ended (earning them first if needed) */
+  function openMyCertificates() {
+    if (!G) return;
+    let list = certs.forGame(G.id);
+    if (!list.length) list = earnCertificates();
+    if (!list.length) { toast(NET && NET.mySeat < 0 ? "Certificates go to the players. This screen was the shared board." : "No certificate on this screen."); return; }
+    certs.open(list, { fromGame: true });
   }
 
   const online = initOnline({

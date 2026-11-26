@@ -3,6 +3,7 @@ import qrcode from "qrcode-generator";
 import { CHARACTERS } from "./data.js";
 import { portrait } from "./art.js";
 import { hostRoom, joinRoom, makeRoomCode, cleanCode, myClientId } from "./net.js";
+import { AI_LEVELS, cpuName } from "./ai.js";
 
 const PROFILE_KEY = "rizolopy-online-profile";
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -13,7 +14,8 @@ const MAX_PLAYERS = 6;
 /**
  * api (from game.js):
  *   showScreen(id)
- *   hostStart(room, players[{cid,name,char}], maxRounds, hostCid)  -> starts the game as host
+ *   hostStart(room, players[{cid,name,char,ai}], maxRounds, hostCid) -> starts the game as host
+ *     (ai = "easy" | "hard" for computer seats the host adds; the host's browser plays them)
  *   hostResume(room, hostCid)                                       -> continue a saved online game
  *   guestStart(room, cid)                                           -> become a guest; game state follows
  *   gameMessage(msg)                                                -> host or guest in-game messages
@@ -104,7 +106,9 @@ export function initOnline(api) {
     const me = lobby.players.find(p => p.cid === cid);
     const taken = new Set(lobby.players.filter(p => p.cid !== cid).map(p => p.char));
     const url = joinUrl(room.code);
-    const enough = lobby.players.length >= 2;
+    const humans = lobby.players.filter(p => !p.ai).length;
+    const enough = lobby.players.length >= 2 && humans >= 1;
+    const free = MAX_PLAYERS - lobby.players.length;
     el().innerHTML = `
       <div class="ol-lobby">
         <div class="ol-codebox">
@@ -118,13 +122,23 @@ export function initOnline(api) {
           <ul class="ol-list">${lobby.players.map(p => {
             const c = charById(p.char);
             return `<li class="${p.cid === cid ? "me" : ""}"><div class="avatar" style="background:${c.color}">${portrait(c)}</div>
-              <div><b>${esc(p.name)}</b>${p.host ? ` <span class="tag">Host</span>` : ""}${p.cid === cid ? ` <span class="tag">You</span>` : ""}
-              <div class="muted ol-small">${esc(c.name)}</div></div></li>`;
+              <div class="ol-who"><b>${esc(p.name)}</b>${p.host ? ` <span class="tag">Host</span>` : ""}${p.cid === cid ? ` <span class="tag">You</span>` : ""}${p.ai ? ` <span class="tag ai-tag">🤖 ${AI_LEVELS[p.ai].short}</span>` : ""}
+              <div class="muted ol-small">${esc(c.name)}</div></div>
+              ${isHost && p.ai ? `<button class="ol-remove" data-olcpu-remove="${esc(p.cid)}" title="Remove ${esc(p.name)}" aria-label="Remove ${esc(p.name)}">✕</button>` : ""}</li>`;
           }).join("") || `<li class="muted">Waiting for players to join…</li>`}</ul>
           ${isHost ? `
+            <div class="ol-cpu">
+              <div class="ol-cpu-head"><b>🤖 Fill empty seats with computer players</b> <span class="muted ol-small">Optional</span></div>
+              ${free > 0 ? `<div class="ol-cpu-btns">
+                <button class="btn btn-small btn-outline" data-olcpu="easy">+ Easy CPU</button>
+                <button class="btn btn-small btn-outline" data-olcpu="hard">+ Hard CPU</button>
+              </div>
+              <p class="muted ol-small">${free} seat${free === 1 ? "" : "s"} free. Players who join later still get a seat while there is room. CPUs play on this screen, so keep it open.</p>`
+              : `<p class="muted ol-small">All 6 seats are taken. Remove a CPU with ✕ to make room for a player.</p>`}
+            </div>
             <div class="setup-row"><label>Game length</label><div class="seg" id="olRounds">${[[10, "Short · 10"], [20, "Normal · 20"], [0, "No limit"]]
               .map(([n, l]) => `<button class="${n === lobby.maxRounds ? "on" : ""}" data-olr="${n}">${l}</button>`).join("")}</div></div>
-            <button class="btn btn-maroon big" data-ol="start" ${enough ? "" : "disabled"}>${enough ? `Start game with ${lobby.players.length} players` : "Waiting for at least 2 players"}</button>`
+            <button class="btn btn-maroon big" data-ol="start" ${enough ? "" : "disabled"}>${enough ? `Start game with ${lobby.players.length} players` : humans ? "Waiting for at least 2 players" : "Add at least one person to play"}</button>`
             : `<p class="ol-waiting">⏳ Waiting for the host to start the game…</p>`}
         </div>
       </div>
@@ -151,7 +165,13 @@ export function initOnline(api) {
       const name = String(m.name || "Player").slice(0, 16);
       let p = lobby.players.find(q => q.cid === m.cid);
       if (!p) {
-        if (lobby.players.length >= MAX_PLAYERS) { room.send({ t: "full", to: m.cid }); return; }
+        if (lobby.players.length >= MAX_PLAYERS) {
+          // a real person beats a CPU: drop the last CPU added to make room
+          const cpu = [...lobby.players].reverse().find(q => q.ai);
+          if (!cpu) { room.send({ t: "full", to: m.cid }); return; }
+          lobby.players = lobby.players.filter(q => q !== cpu);
+          api.toast(`${cpu.name} left to make room`);
+        }
         let nm = name, k = 2;
         while (lobby.players.some(q => q.name.toLowerCase() === nm.toLowerCase())) nm = `${name} ${k++}`;
         p = { cid: m.cid, name: nm, char: freeChar(m.char, m.cid) };
@@ -168,6 +188,21 @@ export function initOnline(api) {
     } else if (m.t === "_reconnected") {
       hostLobbyBroadcast();
     }
+  }
+
+  /** host: seat a computer player in a free seat (never required, just fills the table) */
+  function addCpu(level) {
+    if (!AI_LEVELS[level] || lobby.players.length >= MAX_PLAYERS) return;
+    const char = freeChar(null, null);
+    let base = cpuName(char), nm = base, k = 2;
+    while (lobby.players.some(q => q.name.toLowerCase() === nm.toLowerCase())) nm = `${base} ${k++}`;
+    lobby.players.push({ cid: "cpu-" + Math.random().toString(36).slice(2, 8), name: nm, char, ai: level });
+    hostLobbyBroadcast();
+  }
+  function removeCpu(id) {
+    const before = lobby.players.length;
+    lobby.players = lobby.players.filter(p => !(p.ai && p.cid === id));
+    if (lobby.players.length !== before) hostLobbyBroadcast();
   }
 
   async function host() {
@@ -200,8 +235,9 @@ export function initOnline(api) {
 
   function startGame() {
     if (lobby.players.length < 2) return;
+    if (!lobby.players.some(p => !p.ai)) return;
     inGame = true;
-    api.hostStart(room, lobby.players.map(p => ({ cid: p.cid, name: p.name, char: p.char })), lobby.maxRounds, cid);
+    api.hostStart(room, lobby.players.map(p => ({ cid: p.cid, name: p.name, char: p.char, ai: p.ai || null })), lobby.maxRounds, cid);
   }
 
   /* ---------------- guest ---------------- */
@@ -265,6 +301,10 @@ export function initOnline(api) {
       else if (role === "host") { const me = lobby.players.find(p => p.cid === cid); if (me) { me.char = freeChar(id, cid); profile.char = me.char; saveProfile(); hostLobbyBroadcast(); } }
       return;
     }
+    const cpuAdd = e.target.closest("[data-olcpu]");
+    if (cpuAdd && role === "host") { addCpu(cpuAdd.dataset.olcpu); return; }
+    const cpuRm = e.target.closest("[data-olcpu-remove]");
+    if (cpuRm && role === "host") { removeCpu(cpuRm.dataset.olcpuRemove); return; }
     const r = e.target.closest("[data-olr]");
     if (r) { lobby.maxRounds = Number(r.dataset.olr); hostLobbyBroadcast(); return; }
     const b = e.target.closest("[data-ol]");
