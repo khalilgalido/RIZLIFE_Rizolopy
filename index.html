@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rizalopoly</title>
+  <meta name="description" content="Rizalopoly: a Philippine history board game following José Rizal's life.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ============ LANDING ============ -->
+  <main id="landing" class="screen active">
+    <section class="hero">
+      <div class="hero-text">
+        <p class="eyebrow">🪶 A Philippine History Board Game</p>
+        <h1 class="logo">RIZALOPOLY</h1>
+        <p class="tagline">Travel Through History. Build Your Legacy.</p>
+        <p class="lead">Follow José Rizal from Calamba to Berlin, Ghent, Dapitan and Bagumbayan. Roll the dice, buy the places that shaped his life and novels, draw NOLI and FILI cards, and answer history questions to become the wealthiest player.</p>
+        <div class="hero-buttons">
+          <button class="btn btn-maroon" data-action="play">▶ Play Now</button>
+          <button class="btn btn-green" data-action="howto">How to Play</button>
+          <button class="btn btn-outline" data-action="about">About the Game</button>
+        </div>
+        <button class="btn btn-link hidden" id="resumeBtn" data-action="resume">↻ Resume saved game</button>
+      </div>
+      <div class="hero-board">
+        <div class="board" id="previewBoard">
+          <div class="board-center">
+            <div class="center-logo">RIZALOPOLY</div>
+            <div class="center-sub">Travel Through History</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="features">
+      <div class="feature"><h3>📚 Learn while you play</h3><p>Every property carries a short historical note, every card a Rizal fact.</p></div>
+      <div class="feature"><h3>🗺️ Eight groups of places</h3><p>From his childhood home to his final days, the board follows his journey.</p></div>
+      <div class="feature"><h3>❓ Rizal Quiz</h3><p>Answer questions about his life, travels, schooling and novels to earn bonus Piso.</p></div>
+    </section>
+
+    <section class="characters-section">
+      <h2>Choose Your Character</h2>
+      <div class="char-grid" id="landingChars"></div>
+    </section>
+
+    <footer class="footer">Rizalopoly · a classroom project about the life and works of José Rizal</footer>
+  </main>
+
+  <!-- ============ SETUP ============ -->
+  <main id="setup" class="screen">
+    <div class="setup-card">
+      <button class="btn btn-link back" data-action="home">← Back</button>
+      <h2>New Game</h2>
+      <p class="muted">Everyone plays on this device and passes it around on their turn.</p>
+
+      <div class="setup-row">
+        <label>Players</label>
+        <div class="seg" id="playerCount"></div>
+      </div>
+      <div class="setup-row">
+        <label>Game length</label>
+        <div class="seg" id="roundLimit"></div>
+      </div>
+
+      <div id="playerSlots" class="player-slots"></div>
+
+      <p class="error" id="setupError"></p>
+      <button class="btn btn-maroon big" data-action="start">Start Game</button>
+    </div>
+  </main>
+
+  <!-- ============ GAME ============ -->
+  <main id="game" class="screen">
+    <div class="game-layout">
+      <div class="game-board-wrap">
+        <div class="board" id="gameBoard">
+          <div class="board-center game-center">
+            <div class="center-logo small">RIZALOPOLY</div>
+            <div class="turn-banner" id="turnBanner"></div>
+            <div class="dice" id="dice"><div class="die">⚀</div><div class="die">⚀</div></div>
+            <div class="turn-msg" id="turnMsg"></div>
+            <div class="turn-actions">
+              <button class="btn btn-maroon" id="rollBtn">🎲 Roll Dice</button>
+              <button class="btn btn-green" id="endBtn">End Turn ➜</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <div class="side-head">
+          <span class="round" id="roundInfo"></span>
+          <div>
+            <button class="btn btn-small btn-outline" data-action="rules">Rules</button>
+            <button class="btn btn-small btn-outline" data-action="quit">Quit</button>
+          </div>
+        </div>
+        <div id="playerList" class="player-list"></div>
+        <h4>Your places</h4>
+        <div id="myProps" class="my-props"></div>
+        <h4>Game log</h4>
+        <ul id="log" class="log"></ul>
+      </aside>
+    </div>
+  </main>
+
+  <!-- ============ MODAL ============ -->
+  <div class="modal-backdrop hidden" id="modal">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-buttons" id="modalButtons"></div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
