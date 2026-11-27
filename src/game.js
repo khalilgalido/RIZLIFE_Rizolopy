@@ -10,6 +10,7 @@ import { initOnline } from "./online.js";
 import { initCertificates, newStats } from "./certificate.js";
 import { createChat, makeChatGate } from "./chat.js";
 import { clampMoney, moneyPickerHtml, moneyLabel } from "./money.js";
+import * as Trade from "./trade.js";
 
 export function boot() {
 
@@ -93,10 +94,30 @@ export function boot() {
   function ownsGroup(pi, group) { return groupTiles(group).every(i => G.owned[i] && G.owned[i].owner === pi); }
   function baseRent(i) { return Math.round(TILES[i].price / 10); }
   function upgradeCost(i) { return Math.round(TILES[i].price / 2); }
+  function mortgageValue(i) { return Math.round(TILES[i].price / 2); }
+  function liftCost(i) { return Math.round(mortgageValue(i) * (1 + RULES.mortgageInterest)); }
+  function groupLevels(group) { return groupTiles(group).map(k => (G.owned[k] ? G.owned[k].level : 0)); }
+  function groupMortgaged(group) { return groupTiles(group).some(k => G.owned[k] && G.owned[k].mortgaged); }
+  /** can player pi add a landmark to tile i? (whole group, nothing mortgaged, build evenly) */
+  function canBuildOn(pi, i) {
+    const own = G.owned[i], g = TILES[i].group;
+    return !!own && own.owner === pi && ownsGroup(pi, g) && !groupMortgaged(g)
+      && own.level < RULES.maxUpgrades && own.level === Math.min(...groupLevels(g));
+  }
+  /** can player pi sell a landmark from tile i? (sell evenly: the tallest first) */
+  function canSellOn(pi, i) {
+    const own = G.owned[i];
+    return !!own && own.owner === pi && own.level > 0 && own.level === Math.max(...groupLevels(TILES[i].group));
+  }
+  /** can player pi mortgage tile i? (no landmarks anywhere in its group) */
+  function canMortgage(pi, i) {
+    const own = G.owned[i];
+    return !!own && own.owner === pi && !own.mortgaged && groupLevels(TILES[i].group).every(l => l === 0);
+  }
 
   function rentFor(i) {
     const own = G.owned[i];
-    if (!own) return 0;
+    if (!own || own.mortgaged) return 0;
     const base = baseRent(i);
     if (own.level > 0) return base * RULES.upgradeMultipliers[own.level];
     return ownsGroup(own.owner, TILES[i].group) ? base * RULES.monopolyMultiplier : base;
@@ -106,7 +127,7 @@ export function boot() {
     const p = G.players[pi];
     let total = p.money;
     for (const [i, own] of Object.entries(G.owned)) {
-      if (own.owner === pi) total += TILES[i].price + own.level * upgradeCost(i);
+      if (own.owner === pi) total += (own.mortgaged ? TILES[i].price - mortgageValue(i) : TILES[i].price) + own.level * upgradeCost(i);
     }
     return total;
   }
@@ -123,7 +144,7 @@ export function boot() {
      ========================================================= */
   let aiGen = 0;          // bumped when a game is entered or left, which stops a running CPU loop
   let aiRunning = false;
-  const aiCtx = () => ({ G, rentFor, ownsGroup, upgradeCost, propsOf, groupTiles });
+  const aiCtx = () => ({ G, rentFor, ownsGroup, upgradeCost, propsOf, groupTiles, canBuildOn, liftCost });
   const gameVisible = () => $("#game").classList.contains("active");
   /** true while the player to move is a CPU */
   function aiSeat() { return !!G && G.phase !== "over" && AI.isAI(cur()); }
@@ -146,6 +167,15 @@ export function boot() {
           if (!alive()) break;
           await onRoll(true);
         } else if (G.phase === "end") {
+          if (!G.tutorial && !G.trades) {
+            const offer = Trade.proposeTrade(aiCtx(), G.turn, G.tradeMemo || {});
+            if (offer) { await sleep(AI.pause(G, "think")); if (!alive()) break; await runTrade(offer, true); continue; }
+          }
+          for (const i of AI.decideLifts(aiCtx(), G.turn)) {
+            if (!alive()) break;
+            await sleep(AI.pause(G, "build"));
+            liftMortgage(i, true);
+          }
           for (const i of AI.decideBuilds(aiCtx(), G.turn)) {
             if (!alive()) break;
             await sleep(AI.pause(G, "build"));
@@ -194,28 +224,31 @@ export function boot() {
   async function raiseFunds(pi, needed) {
     const p = G.players[pi];
     const sold = [];
-    // 1) sell landmarks back at half price, most expensive property first
-    let props = propsOf(pi).sort((a, b) => TILES[b].price - TILES[a].price);
-    for (const i of props) {
-      while (p.money < needed && G.owned[i].level > 0) {
-        G.owned[i].level--;
-        const v = Math.round(upgradeCost(i) / 2);
-        p.money += v;
-        sold.push(`a landmark on ${TILES[i].name} (${peso(v)})`);
+    // 1) mortgage places in groups without landmarks, cheapest first
+    const mortgageSome = () => {
+      for (const i of propsOf(pi).sort((a, b) => TILES[a].price - TILES[b].price)) {
+        if (p.money >= needed) return;
+        if (!canMortgage(pi, i)) continue;
+        G.owned[i].mortgaged = true;
+        p.money += mortgageValue(i);
+        sold.push(`mortgaged ${TILES[i].name} (+${peso(mortgageValue(i))})`);
       }
-    }
-    // 2) sell properties back to the bank at half price, cheapest first
-    props = propsOf(pi).sort((a, b) => TILES[a].price - TILES[b].price);
-    for (const i of props) {
-      if (p.money >= needed) break;
-      const v = Math.round(TILES[i].price / 2);
-      delete G.owned[i];
+    };
+    mortgageSome();
+    // 2) sell landmarks back at half price, evenly, most expensive group first
+    for (let guard = 0; guard < 100 && p.money < needed; guard++) {
+      const i = propsOf(pi).filter(k => canSellOn(pi, k)).sort((a, b) => TILES[b].price - TILES[a].price)[0];
+      if (i === undefined) break;
+      G.owned[i].level--;
+      const v = Math.round(upgradeCost(i) / 2);
       p.money += v;
-      sold.push(`${TILES[i].name} (${peso(v)})`);
+      sold.push(`sold a landmark on ${TILES[i].name} (+${peso(v)})`);
     }
+    // 3) groups with no landmarks left can now be mortgaged too
+    mortgageSome();
     if (sold.length) {
-      log(`${p.name} sold ${sold.join(", ")} to pay debts.`);
-      await alertModal("Raising funds", `<p><b>${esc(p.name)}</b> did not have enough Piso and sold:</p><ul>${sold.map(s => `<li>${esc(s)}</li>`).join("")}</ul>`);
+      log(`${p.name} raised money to pay debts: ${sold.join(", ")}.`);
+      await alertModal("Raising funds", `<p><b>${esc(p.name)}</b> did not have enough Piso, so the bank:</p><ul>${sold.map(s => `<li>${esc(s)}</li>`).join("")}</ul>`);
     }
   }
 
@@ -229,10 +262,24 @@ export function boot() {
       if (toIdx !== null) G.players[toIdx].money += left;
       p.money = 0;
       p.bankrupt = true;
-      propsOf(fromIdx).forEach(i => delete G.owned[i]);
-      log(`💀 ${p.name} is bankrupt!`);
+      const places = propsOf(fromIdx);
+      let where;
+      if (toIdx !== null) {
+        // like Monopoly, the player you owe takes everything you have left (mortgages stay)
+        const c = G.players[toIdx];
+        places.forEach(i => { G.owned[i].owner = toIdx; G.owned[i].level = 0; });
+        c.freeExit = (c.freeExit || 0) + (p.freeExit || 0);
+        p.freeExit = 0;
+        where = places.length ? `${c.name} takes ${places.length === 1 ? "their place" : `their ${places.length} places`}${places.some(i => G.owned[i].mortgaged) ? " (mortgages included)" : ""}.` : `${c.name} takes their last ${peso(left)}.`;
+        log(`💀 ${p.name} is bankrupt! ${where}`);
+        places.forEach(i => { if (ownsGroup(toIdx, TILES[i].group)) toast(`${c.name} completed the ${GROUPS[TILES[i].group].name} group!`, true); });
+      } else {
+        places.forEach(i => delete G.owned[i]);
+        where = "Their places return to the bank.";
+        log(`💀 ${p.name} is bankrupt!`);
+      }
       refresh();
-      await alertModal("Bankrupt!", `<p><b>${esc(p.name)}</b> cannot pay ${peso(amount)} and is out of the game. Their places return to the bank.</p>`);
+      await alertModal("Bankrupt!", `<p><b>${esc(p.name)}</b> cannot pay ${peso(amount)} and is out of the game. ${esc(where)}</p>`);
       return false;
     }
     p.money -= amount;
@@ -400,6 +447,9 @@ export function boot() {
       const own = G.owned[i];
       if (!own) {
         await offerBuy(pi, i);
+      } else if (own.owner !== pi && own.mortgaged) {
+        G.msg = `${t.name} is mortgaged, so ${G.players[own.owner].name} collects no rent.`;
+        log(G.msg);
       } else if (own.owner !== pi) {
         const owner = G.players[own.owner];
         const rent = rentFor(i);
@@ -459,6 +509,75 @@ export function boot() {
       }
     } else {
       G.msg = `${p.name} decided not to buy ${t.name}.`;
+      if (!G.tutorial) await auction(i);
+    }
+  }
+
+  /**
+   * Auction a place nobody bought. Bidders take turns, starting after the current player:
+   * raise the bid or drop out. The last one left pays their bid. If nobody bids, it stays unowned.
+   */
+  async function auction(i) {
+    const t = TILES[i];
+    const order = [];
+    for (let k = 1; k <= G.players.length; k++) {
+      const pi = (G.turn + k) % G.players.length;
+      if (!G.players[pi].bankrupt && !(NET && G.players[pi].offline && !AI.isAI(G.players[pi]))) order.push(pi);
+    }
+    let live = order.filter(pi => G.players[pi].money >= RULES.auctionStart);
+    if (!live.length) return;
+    let bid = 0, leader = -1;
+    log(`🔨 ${t.name} goes up for auction.`);
+    sfx("coin");
+    const humans = order.filter(k => !AI.isAI(G.players[k])).length;
+    let at = 0;
+    for (let guard = 0; guard < 400 && live.length && !(live.length === 1 && live[0] === leader); guard++) {
+      at %= live.length;
+      const pi = live[at];
+      if (pi === leader) { at++; continue; }
+      const p = G.players[pi];
+      const minBid = bid ? bid + 10 : RULES.auctionStart;
+      if (p.money < minBid) { live.splice(at, 1); continue; }
+      const steps = [...new Set([10, 50, 100].map(d => (bid ? bid + d : Math.max(RULES.auctionStart, d))))];
+      const buttons = [{ label: "Drop out", value: "pass", cls: "btn-outline" }]
+        .concat(steps.map((v, k) => ({ label: `Bid ${peso(v)}`, value: String(v), cls: k === 0 ? "btn-maroon" : "btn-gold", disabled: p.money < v })));
+      const status = leader >= 0 ? `Top bid: <b>${peso(bid)}</b> by <b>${esc(G.players[leader].name)}</b>.` : `No bids yet. Bids start at ${peso(RULES.auctionStart)}.`;
+      const chips = live.map(k => `<span class="auc-chip ${k === pi ? "on" : ""} ${k === leader ? "lead" : ""}">${esc(G.players[k].name)}</span>`).join("");
+      const pass = !NET && !AI.isAI(p) && humans > 1 ? `<p class="pass-note">Pass the device to <b>${esc(p.name)}</b>.</p>` : "";
+      const choice = await modal({
+        body: `<h2>🔨 Auction: ${esc(t.name)}</h2>${pass}<div class="auc-bidders">${chips}</div>
+          <p>${status}</p><p><b>${esc(p.name)}</b>, raise the bid or drop out. You have ${peso(p.money)} (list price ${peso(t.price)}).</p>`,
+        buttons, decider: pi,
+        ai: AI.isAI(p) ? AI.decideBid(aiCtx(), pi, i, bid, steps.filter(v => v <= p.money)) : undefined,
+      });
+      if (!G || G.phase === "over") return;
+      if (choice === "pass" || isNaN(Number(choice))) {
+        live.splice(at, 1);
+        log(`${p.name} drops out of the auction.`);
+      } else {
+        bid = Number(choice); leader = pi; at++;
+        log(`${p.name} bids ${peso(bid)} for ${t.name}.`);
+      }
+    }
+    if (leader < 0) {
+      G.msg = `Nobody bid on ${t.name}. It stays with the bank.`;
+      log(G.msg); refresh();
+      return;
+    }
+    const w = G.players[leader];
+    w.money -= bid;
+    G.owned[i] = { owner: leader, level: 0 };
+    stat(leader, "bought", 1);
+    sfx("coin");
+    stampTile(i);
+    log(`🔨 ${w.name} wins ${t.name} at auction for ${peso(bid)}.`);
+    G.msg = `${w.name} won ${t.name} for ${peso(bid)}!`;
+    refresh();
+    toast(G.msg, true);
+    if (ownsGroup(leader, t.group)) {
+      log(`${w.name} now owns all of ${GROUPS[t.group].name}. Rent doubles and landmarks can be built.`);
+      toast(`${w.name} completed the ${GROUPS[t.group].name} group!`, true);
+      confetti(120);
     }
   }
 
@@ -546,6 +665,7 @@ export function boot() {
 
   function advanceTurn() {
     G.doubles = 0;
+    G.trades = 0;
     let next = G.turn;
     do {
       next = (next + 1) % G.players.length;
@@ -674,6 +794,8 @@ export function boot() {
     const p = cur();
     const own = G.owned[i];
     if (!own || own.owner !== G.turn || !ownsGroup(G.turn, TILES[i].group) || own.level >= RULES.maxUpgrades) return;
+    if (groupMortgaged(TILES[i].group)) { toast(`Lift the mortgages in ${GROUPS[TILES[i].group].name} before building.`); return; }
+    if (!canBuildOn(G.turn, i)) { toast(`Build evenly: give every place in ${GROUPS[TILES[i].group].name} a landmark first.`); return; }
     const cost = upgradeCost(i);
     if (p.money < cost) { toast(`You need ${peso(cost)} to build here.`); return; }
     p.money -= cost;
@@ -684,6 +806,180 @@ export function boot() {
     log(`${p.name} built a landmark on ${TILES[i].name} for ${peso(cost)}. Rent is now ${peso(rentFor(i))}.`);
     toast(`Landmark built on ${TILES[i].name}! Rent is now ${peso(rentFor(i))}`, true);
     save(); refresh();
+  }
+
+  /** your-turn property actions that need no dialog */
+  function ownTurnOk(fromAI) {
+    if (busy || G.phase === "over" || (G.phase !== "roll" && G.phase !== "end")) return false;
+    if (!fromAI && aiSeat()) return false;
+    return true;
+  }
+  function sellLandmark(i, fromAI) {
+    if (!ownTurnOk(fromAI) || !canSellOn(G.turn, i)) { if (G.owned[i] && G.owned[i].level) toast("Sell evenly: take landmarks off the place with the most first."); return; }
+    const p = cur();
+    const v = Math.round(upgradeCost(i) / 2);
+    G.owned[i].level--;
+    p.money += v;
+    sfx("coin");
+    log(`${p.name} sold a landmark on ${TILES[i].name} for ${peso(v)}.`);
+    toast(`Sold a landmark on ${TILES[i].name} for ${peso(v)}`, true);
+    save(); refresh();
+  }
+  function mortgage(i, fromAI) {
+    if (!ownTurnOk(fromAI)) return;
+    if (!canMortgage(G.turn, i)) { toast(`Sell the landmarks in ${GROUPS[TILES[i].group].name} before mortgaging.`); return; }
+    const p = cur();
+    G.owned[i].mortgaged = true;
+    p.money += mortgageValue(i);
+    sfx("coin");
+    log(`${p.name} mortgaged ${TILES[i].name} for ${peso(mortgageValue(i))}. It charges no rent until the mortgage is lifted.`);
+    toast(`${TILES[i].name} mortgaged for ${peso(mortgageValue(i))}`, true);
+    save(); refresh();
+  }
+  function liftMortgage(i, fromAI) {
+    if (!ownTurnOk(fromAI)) return;
+    const own = G.owned[i], p = cur();
+    if (!own || own.owner !== G.turn || !own.mortgaged) return;
+    const cost = liftCost(i);
+    if (p.money < cost) { toast(`You need ${peso(cost)} to lift this mortgage.`); return; }
+    p.money -= cost;
+    own.mortgaged = false;
+    sfx("build");
+    stampTile(i);
+    log(`${p.name} lifted the mortgage on ${TILES[i].name} for ${peso(cost)}.`);
+    toast(`${TILES[i].name} earns rent again`, true);
+    save(); refresh();
+  }
+
+  /* =========================================================
+     Trading
+     ========================================================= */
+  function canTradeNow() {
+    if (!G || G.tutorial || busy || G.phase === "over" || (G.phase !== "roll" && G.phase !== "end")) return false;
+    if (!canAct() || aiSeat() || activePlayers().length < 2) return false;
+    if (NET && NET.mySeat !== G.turn) return false;
+    return (G.trades || 0) < Trade.MAX_TRADES_PER_TURN;
+  }
+
+  function tradeSideHtml(pi, tiles, money, letters) {
+    const items = tiles.map(i => `<li><span class="sw" style="background:${GROUPS[TILES[i].group].color}"></span>${TILES[i].icon} ${esc(TILES[i].name)}${G.owned[i] && G.owned[i].mortgaged ? ` <span class="mort-tag">mortgaged</span>` : ""}</li>`);
+    if (money) items.push(`<li>💰 ${peso(money)}</li>`);
+    if (letters) items.push(`<li>✉️ ${letters} Blumentritt letter${letters > 1 ? "s" : ""}</li>`);
+    return `<div class="trade-side"><h4>${esc(G.players[pi].name)} gives</h4><ul>${items.join("") || "<li class=muted>nothing</li>"}</ul></div>`;
+  }
+  function tradeSummaryHtml(o) {
+    return `<div class="trade-sum">${tradeSideHtml(o.from, o.give, o.giveMoney, o.giveLetters)}<div class="trade-arrows">⇄</div>${tradeSideHtml(o.to, o.get, o.getMoney, o.getLetters)}</div>`;
+  }
+
+  /** the offer builder: only on the proposer's own screen */
+  function openTradeBuilder() {
+    if (!canTradeNow() || !$("#modal").classList.contains("hidden")) return;
+    const me = G.turn;
+    const partners = G.players.map((p, k) => k).filter(k => k !== me && !G.players[k].bankrupt);
+    const o = Trade.emptyOffer(me, partners[0]);
+    const ctx = aiCtx();
+    const placeList = (pi, chosen) => {
+      const mine = propsOf(pi);
+      if (!mine.length) return `<p class="muted">No places.</p>`;
+      return mine.map(i => {
+        const ok = Trade.tradable(ctx, i), own = G.owned[i];
+        return `<label class="trade-pick ${ok ? "" : "off"}"><input type="checkbox" data-tp="${pi}" value="${i}" ${chosen.includes(i) ? "checked" : ""} ${ok ? "" : "disabled"}>
+          <span class="sw" style="background:${GROUPS[TILES[i].group].color}"></span>${TILES[i].icon} ${esc(TILES[i].name)}
+          ${own.mortgaged ? `<span class="mort-tag">mortgaged</span>` : ""}${ok ? "" : `<span class="muted"> (landmarks in group)</span>`}</label>`;
+      }).join("");
+    };
+    const col = (pi, tiles, mkey, lkey, title) => {
+      const p = G.players[pi];
+      return `<div class="trade-col"><h4>${title}</h4>${placeList(pi, tiles)}
+        <label class="trade-money">💰 Piso <input type="number" min="0" step="10" max="${p.money}" value="${o[mkey] || ""}" placeholder="0" data-tm="${mkey}"> <span class="muted">of ${peso(p.money)}</span></label>
+        ${p.freeExit ? `<label class="trade-money">✉️ Letters <input type="number" min="0" max="${p.freeExit}" value="${o[lkey] || ""}" placeholder="0" data-tm="${lkey}"> <span class="muted">of ${p.freeExit}</span></label>` : ""}</div>`;
+    };
+    const body = () => `<h2>🤝 Make a trade</h2>
+      <div class="trade-partners">${partners.map(k => `<button type="button" class="${k === o.to ? "on" : ""}" data-tpartner="${k}">${portrait(charById(G.players[k].char))} ${esc(G.players[k].name)}</button>`).join("")}</div>
+      <div class="trade-grid">${col(me, o.give, "giveMoney", "giveLetters", "You give")}${col(o.to, o.get, "getMoney", "getLetters", `${esc(G.players[o.to].name)} gives`)}</div>
+      <p class="fact">Places in a group with landmarks cannot be traded. Mortgaged places keep their mortgage.</p>
+      <p class="trade-err"></p>`;
+    const bind = () => {
+      const mb = $("#modalBody");
+      mb.querySelectorAll("[data-tpartner]").forEach(b => b.addEventListener("click", () => {
+        o.to = Number(b.dataset.tpartner); o.get = []; o.getMoney = 0; o.getLetters = 0;
+        mb.innerHTML = body(); bind();
+      }));
+      mb.querySelectorAll("[data-tp]").forEach(c => c.addEventListener("change", () => {
+        const list = Number(c.dataset.tp) === me ? o.give : o.get, i = Number(c.value);
+        const at = list.indexOf(i);
+        if (c.checked && at < 0) list.push(i); else if (!c.checked && at >= 0) list.splice(at, 1);
+      }));
+      mb.querySelectorAll("[data-tm]").forEach(inp => inp.addEventListener("input", () => {
+        o[inp.dataset.tm] = Math.max(0, Math.floor(Number(inp.value) || 0));
+      }));
+    };
+    openModal(body(), [{ label: "Cancel", value: "cancel", cls: "btn-outline" }, { label: "Send offer", value: "send" }], {
+      onPick: v => {
+        if (v !== "send") { closeModal(); restoreNetModal(); return; }
+        const err = Trade.checkOffer(ctx, o);
+        if (err) { $("#modalBody .trade-err").textContent = err; return; }
+        closeModal();
+        submitTrade(o);
+      },
+    });
+    bind();
+  }
+
+  function submitTrade(o) { requestAct("trade", undefined, o); }
+
+  /** host / offline: ask the partner, then swap. CPUs answer for themselves. */
+  async function runTrade(raw, fromAI) {
+    const o = Trade.cleanOffer(raw);
+    if (!o || o.from !== G.turn || busy || G.phase === "over" || (G.phase !== "roll" && G.phase !== "end")) return;
+    if (!fromAI && aiSeat()) return;
+    if ((G.trades || 0) >= Trade.MAX_TRADES_PER_TURN) { toast(`That's ${Trade.MAX_TRADES_PER_TURN} offers this turn already.`); return; }
+    const err = Trade.checkOffer(aiCtx(), o);
+    if (err) { toast(err); return; }
+    const A = G.players[o.from], B = G.players[o.to];
+    busy = true;
+    G.trades = (G.trades || 0) + 1;
+    G.msg = `${A.name} offers ${B.name} a trade.`;
+    log(`🤝 ${A.name} offers ${B.name} a trade.`);
+    refresh();
+    try {
+      let answer;
+      if (AI.isAI(B)) {
+        answer = Trade.decideTrade(aiCtx(), o);
+        await alertModal(`${B.name} ${answer === "accept" ? "accepts" : "says no to"} the trade`, tradeSummaryHtml(o), "OK", { decider: o.from });
+      } else if (NET && B.offline) {
+        answer = "decline";
+        await alertModal("Trade not sent", `<p>${esc(B.name)} is offline right now, so they can't answer.</p>`, "OK", { decider: o.from });
+      } else {
+        const pass = !NET ? `<p class="pass-note">Pass the device to <b>${esc(B.name)}</b>.</p>` : "";
+        answer = await modal({
+          body: `<h2>🤝 Trade offer for ${esc(B.name)}</h2>${pass}<p><b>${esc(A.name)}</b> wants to trade:</p>${tradeSummaryHtml(o)}`,
+          buttons: [{ label: "No thanks", value: "decline", cls: "btn-outline" }, { label: "Accept trade", value: "accept", cls: "btn-green" }],
+          decider: o.to, human: true,
+        });
+      }
+      if (!G || G.phase === "over") return;
+      if (answer === "accept" && !Trade.checkOffer(aiCtx(), o)) {
+        const done = Trade.applyOffer(aiCtx(), o);
+        [...o.give, ...o.get].forEach(i => stampTile(i));
+        sfx("coin");
+        log(`🤝 ${B.name} accepted ${A.name}'s trade.`);
+        G.msg = `${A.name} and ${B.name} made a trade!`;
+        toast(G.msg, true);
+        const completed = [...done.from.map(g => [A, g]), ...done.to.map(g => [B, g])];
+        completed.forEach(([p, g]) => { log(`${p.name} now owns all of ${GROUPS[g].name}.`); toast(`${p.name} completed the ${GROUPS[g].name} group!`, true); });
+        if (completed.length) confetti(120);
+      } else {
+        G.tradeMemo = G.tradeMemo || {};
+        G.tradeMemo[Trade.offerKey(o)] = G.round;
+        log(`${B.name} turned down ${A.name}'s trade.`);
+        G.msg = `${B.name} said no to the trade.`;
+        if (!AI.isAI(B)) toast(G.msg, true);
+      }
+    } finally {
+      busy = false;
+      if (G && G.phase !== "over") { save(); refresh(); }
+    }
   }
 
   /* =========================================================
@@ -730,12 +1026,25 @@ export function boot() {
     $("#myProps").innerHTML = mine.length === 0 ? `<p class="muted" style="margin:0">${esc(sp.name)} owns no places yet.</p>`
       : mine.map(i => {
         const t = TILES[i], own = G.owned[i];
-        const canBuild = seat === G.turn && act && ownsGroup(G.turn, t.group) && own.level < RULES.maxUpgrades && G.phase !== "over" && !busy && !AI.isAI(p);
-        return `<div class="prop-row"><span class="sw" style="background:${GROUPS[t.group].color}"></span>
-          <span class="nm">${t.icon} ${esc(t.name)} ${"🏛".repeat(own.level)}</span>
-          <span class="muted">rent ${peso(rentFor(i))}</span>
-          ${canBuild ? `<button class="btn btn-gold" data-build="${i}" title="Build a landmark for ${peso(upgradeCost(i))}">+🏛 ${peso(upgradeCost(i))}</button>` : ""}</div>`;
+        const myTurn = seat === G.turn && act && (G.phase === "roll" || G.phase === "end") && !busy && !AI.isAI(p);
+        const canBuild = myTurn && canBuildOn(G.turn, i);
+        const btns = !myTurn ? "" : [
+          canBuild ? `<button class="btn btn-gold" data-build="${i}" title="Build a landmark for ${peso(upgradeCost(i))}">+🏛 ${peso(upgradeCost(i))}</button>` : "",
+          canSellOn(G.turn, i) ? `<button class="btn btn-outline" data-sell="${i}" title="Sell a landmark for ${peso(Math.round(upgradeCost(i) / 2))}">−🏛</button>` : "",
+          canMortgage(G.turn, i) ? `<button class="btn btn-outline" data-mortgage="${i}" title="Mortgage for ${peso(mortgageValue(i))}. It charges no rent until lifted.">Mortgage +${peso(mortgageValue(i))}</button>` : "",
+          own.mortgaged ? `<button class="btn btn-green" data-lift="${i}" title="Pay back the mortgage plus ${Math.round(RULES.mortgageInterest * 100)}%">Lift ${peso(liftCost(i))}</button>` : "",
+        ].join("");
+        return `<div class="prop-row ${own.mortgaged ? "mortgaged" : ""}"><span class="sw" style="background:${GROUPS[t.group].color}"></span>
+          <span class="nm">${t.icon} ${esc(t.name)} ${"🏛".repeat(own.level)}${own.mortgaged ? ` <span class="mort-tag">mortgaged</span>` : ""}</span>
+          <span class="muted">${own.mortgaged ? "no rent" : `rent ${peso(rentFor(i))}`}</span>
+          <span class="prop-btns">${btns}</span></div>`;
       }).join("");
+    const tradeBtn = $("#tradeBtn");
+    if (tradeBtn) {
+      tradeBtn.classList.toggle("hidden", !G || !!G.tutorial || activePlayers().length < 2);
+      tradeBtn.disabled = !canTradeNow();
+      tradeBtn.title = canTradeNow() ? "Offer a trade to another player" : "You can trade on your own turn";
+    }
 
     $("#log").innerHTML = G.log.slice(-60).reverse().map(l => `<li>${esc(l)}</li>`).join("");
     if (!!G.chatOff !== lastChatOff) { lastChatOff = !!G.chatOff; chat.refreshPanel(); }
@@ -839,8 +1148,12 @@ export function boot() {
    * keepOpen: the dialog stays up (locked) after the answer until endModal().
    */
   let netModal = null, modalSeq = 0;
+  function seatIsAI(d) {
+    if (!G || d === "all" || G.phase === "over") return false;
+    return AI.isAI(G.players[d === undefined ? G.turn : d]);
+  }
   function modal({ body, buttons, decider, keepOpen, local, ai, human, onOpen }) {
-    if (!human && !local && !NET && aiSeat()) return aiModal({ body, buttons, keepOpen, ai });
+    if (!human && !local && !NET && seatIsAI(decider)) return aiModal({ body, buttons, keepOpen, ai, who: G.players[decider === undefined ? G.turn : decider] });
     if (!isHost() || local || !G) {
       return new Promise(resolve => {
         const done = v => { resolve(v); if (local) restoreNetModal(); };
@@ -850,8 +1163,8 @@ export function boot() {
       });
     }
     const d = decider === undefined ? G.turn : decider;
-    const cpu = !human && d === G.turn && aiSeat();
-    if (cpu) body = aiBanner(cur(), ai !== undefined) + body;
+    const cpu = !human && seatIsAI(d);
+    if (cpu) body = aiBanner(G.players[d], ai !== undefined) + body;
     return new Promise(resolve => {
       const mid = ++modalSeq;
       netModal = { mid, body, buttons, decider: d, keepOpen, resolve, cpu };
@@ -888,7 +1201,7 @@ export function boot() {
    * (`ai`, or the last button for plain notices) and presses it after a pause. With no buttons
    * (the quiz) `ai` names the [data-choice] to press.
    */
-  function aiModal({ body, buttons, keepOpen, ai }) {
+  function aiModal({ body, buttons, keepOpen, ai, who }) {
     const choice = buttons.length === 0;
     const idx = choice ? -1 : ai === undefined ? buttons.length - 1 : buttons.findIndex(b => b.value === ai);
     const pick = choice ? ai : buttons[idx].value;
@@ -896,7 +1209,7 @@ export function boot() {
     return (async () => {
       while (!$("#modal").classList.contains("hidden")) await sleep(120); // one dialog at a time
       return new Promise(resolve => {
-        openModal(aiBanner(cur(), ai !== undefined) + body, buttons.map((b, k) => ({ ...b, disabled: b.disabled || k !== idx })),
+        openModal(aiBanner(who || cur(), ai !== undefined) + body, buttons.map((b, k) => ({ ...b, disabled: b.disabled || k !== idx })),
           { locked: choice });
         modalResolve = resolve;
         const btn = choice ? $("#modalBody").querySelector(`[data-choice="${pick}"]`) : $("#modalButtons").children[idx];
@@ -978,7 +1291,8 @@ export function boot() {
         <tr><td>Rent with whole group</td><td>${peso(base * RULES.monopolyMultiplier)}</td></tr>
         ${[1, 2, 3].map(l => `<tr><td>With ${l} landmark${l > 1 ? "s" : ""} 🏛</td><td>${peso(base * RULES.upgradeMultipliers[l])}</td></tr>`).join("")}
         <tr><td>Landmark cost</td><td>${peso(upgradeCost(i))}</td></tr>
-        ${owner ? `<tr><td>Owner</td><td>${esc(owner)}${own.level ? ` (${own.level} 🏛)` : ""}</td></tr>` : ""}
+        <tr><td>Mortgage value</td><td>${peso(mortgageValue(i))}</td></tr>
+        ${owner ? `<tr><td>Owner</td><td>${esc(owner)}${own.level ? ` (${own.level} 🏛)` : ""}${own.mortgaged ? " (mortgaged)" : ""}</td></tr>` : ""}
       </table>`;
   }
 
@@ -998,13 +1312,15 @@ export function boot() {
       <ol class="rules-list">
         <li>2 to 6 players share one device. Each picks a character and starts with <b>${peso(G && G.startMoney ? G.startMoney : RULES.startMoney)}</b>${G && G.startMoney ? "" : " (or the amount chosen on the setup screen)"}.</li>
         <li>On your turn, <b>roll two dice</b> and move counter-clockwise. Passing <b>START</b> pays ${peso(RULES.passStart)}.</li>
-        <li>Land on an unowned place to <b>buy</b> it. Land on someone else's place and you <b>pay rent</b>.</li>
-        <li>Own every place in a colour group to <b>double the rent</b> and build up to ${RULES.maxUpgrades} <b>landmarks 🏛</b> on each, which raise rent a lot.</li>
+        <li>Land on an unowned place to <b>buy</b> it. If you skip it, it goes to <b>auction</b> and everyone can bid. Land on someone else's place and you <b>pay rent</b>.</li>
+        <li>Own every place in a colour group to <b>double the rent</b> and build up to ${RULES.maxUpgrades} <b>landmarks 🏛</b> on each, which raise rent a lot. Build <b>evenly</b>: every place in the group needs a landmark before any gets a second. You can sell landmarks back for half price.</li>
+        <li><b>Trade</b> places, Piso and Blumentritt letters with other players on your turn. Places in a group with landmarks cannot be traded.</li>
+        <li><b>Mortgage</b> a place for half its price. It charges no rent until you pay that back plus ${Math.round(RULES.mortgageInterest * 100)}%.</li>
         <li><b>NOLI</b> and <b>FILI</b> tiles draw a card based on Rizal's novels. Each card teaches a fact.</li>
         <li><b>Quiz Corner</b>: answer a Rizal question correctly to earn ${peso(RULES.quizReward)}.</li>
         <li><b>Dapitan Exile</b>: if a card or three doubles send you there, pay ${peso(RULES.exileFee)} or roll doubles to leave.</li>
         <li>Rolling doubles lets you roll again.</li>
-        <li>If you cannot pay, your landmarks and places are sold to the bank at half price. If that is not enough, you are bankrupt.</li>
+        <li>If you cannot pay, the bank mortgages your places and sells your landmarks for you. If that is not enough, you are bankrupt: what you have left goes to the player you owe, or back to the bank.</li>
         <li>The game ends when only one player is left, or after the round limit. The player with the highest <b>net worth</b> wins.</li>
       </ol>`;
   }
@@ -1226,21 +1542,25 @@ export function boot() {
     NET.room.send({ t, ...data });
   }
 
-  function requestAct(a, i) {
+  function requestAct(a, i, extra) {
     if (!G || !board || G.phase === "over" || busy) return; // the board may still be loading
     if (a === "roll" && G.phase !== "roll") return;
     if (a === "end" && G.phase !== "end") return;
+    if (a === "trade" && !canTradeNow()) return;
     if (!canAct()) { if (NET) toast(`It's ${cur().name}'s turn.`); return; }
     if (isGuest()) {
       if (a === "build") {
         const cost = upgradeCost(i);
         if (cur().money < cost) { toast(`You need ${peso(cost)} to build here.`); return; }
       }
+      if (a === "trade") { NET.room.send({ t: "act", a, offer: extra }); busy = true; refresh(); return; }
       NET.room.send({ t: "act", a, i });
       busy = true; refresh(); // until the host answers with fresh state
       return;
     }
     if (a === "roll") onRoll(); else if (a === "end") onEndTurn(); else if (a === "build") build(i);
+    else if (a === "sell") sellLandmark(i); else if (a === "mortgage") mortgage(i); else if (a === "lift") liftMortgage(i);
+    else if (a === "trade") runTrade(extra);
   }
 
   function hostStart(room, players, maxRounds, hostCid, startMoney) {
@@ -1292,6 +1612,10 @@ export function boot() {
       if (m.a === "roll") onRoll();
       else if (m.a === "end") onEndTurn();
       else if (m.a === "build") build(Number(m.i));
+      else if (m.a === "sell") sellLandmark(Number(m.i));
+      else if (m.a === "mortgage") mortgage(Number(m.i));
+      else if (m.a === "lift") liftMortgage(Number(m.i));
+      else if (m.a === "trade") runTrade(m.offer);
       refresh();
     } else if (m.t === "chat") {
       const seat = seatOfCid(m.cid);
@@ -1493,6 +1817,11 @@ export function boot() {
     }
     const b = e.target.closest("[data-build]");
     if (b) requestAct("build", Number(b.dataset.build));
+    for (const a of ["sell", "mortgage", "lift"]) {
+      const el = e.target.closest(`[data-${a}]`);
+      if (el) requestAct(a, Number(el.dataset[a]));
+    }
+    if (e.target.closest("#tradeBtn")) openTradeBuilder();
   });
   document.addEventListener("keydown", e => {
     if (!$("#modal").classList.contains("hidden") || !$("#splash").classList.contains("hidden")) return;
@@ -1511,5 +1840,5 @@ export function boot() {
   online.openFromLink();
 
   // expose a tiny hook for automated testing
-  window.__rizalopoly = { get state() { return G; }, get net() { return NET && { role: NET.role, mySeat: NET.mySeat, code: NET.room.code }; }, rentFor: i => rentFor(i) };
+  window.__rizalopoly = { get state() { return G; }, get net() { return NET && { role: NET.role, mySeat: NET.mySeat, code: NET.room.code }; }, rentFor: i => rentFor(i), pay: (a, b, n) => pay(a, b, n), refresh: () => refresh() };
 }
