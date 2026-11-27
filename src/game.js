@@ -1023,11 +1023,24 @@ export function boot() {
           <div class="p-swatches">${swatches || `<span class="muted">no places yet</span>`}</div></div>
         <div class="p-money">${peso(pl.money)}</div></div>`;
     }).join("");
+    $("#mobileBar").classList.toggle("many", G.players.length > 3);
+    $("#mobileBar").innerHTML = `<span class="mb-round">${G.maxRounds ? `R${G.round}/${G.maxRounds}` : `R${G.round}`}</span>` +
+      G.players.map((pl, i) => {
+        const ch = charById(pl.char);
+        const on = i === G.turn && G.phase !== "over";
+        return `<div class="mb-chip ${on ? "current" : ""} ${pl.bankrupt ? "out" : ""}" style="--c:${ch.color}" data-mchip="${i}" title="${esc(pl.name)}">
+          <div class="avatar" style="background:${ch.color}">${portrait(ch)}</div>
+          <div class="mb-text"><span class="mb-name">${esc(pl.name.replace(/\s*\(CPU\)$/, ""))}</span><span class="mb-money">${pl.bankrupt ? "Out" : peso(pl.money)}</span></div></div>`;
+      }).join("");
+    const curChip = $("#mobileBar .mb-chip.current");
+    if (curChip) { const bar = curChip.parentElement; bar.scrollLeft = Math.max(0, curChip.offsetLeft - (bar.clientWidth - curChip.offsetWidth) / 2); }
     if (lastMoney) {
       G.players.forEach((pl, i) => {
         const d = pl.money - (lastMoney[i] ?? pl.money);
         if (d !== 0) {
           FX.floatText($(`[data-prow="${i}"] .p-money`), (d > 0 ? "+" : "−") + peso(Math.abs(d)), d > 0);
+          const chip = $(`[data-mchip="${i}"] .mb-money`);
+          if (chip && chip.offsetParent) FX.floatText(chip, (d > 0 ? "+" : "−") + peso(Math.abs(d)), d > 0);
           if (board && !pl.bankrupt) board.floatAtTile(pl.pos, (d > 0 ? "+" : "−") + peso(Math.abs(d)), d > 0);
         }
       });

@@ -698,3 +698,63 @@ img.portrait { width: 100%; height: 100%; border-radius: 50%; display: block; ob
   .trade-grid, .trade-sum { grid-template-columns: 1fr; }
   .trade-arrows { transform: rotate(90deg); justify-self: center; }
 }
+
+
+/* ---------- UI polish: phone status bar, centered desktop, phone home buttons ---------- */
+/* phone status bar: hidden on wide screens, sticky across the top on phones/tablets */
+.mobile-bar { display: none; }
+@media (max-width: 1000px) {
+  #game.active .mobile-bar {
+    display: flex; position: sticky; top: 0; z-index: 50; gap: 6px; align-items: center;
+    padding: 6px 8px; overflow-x: auto; scrollbar-width: none;
+    background: linear-gradient(#6e1a2c, #521221); border-bottom: 3px solid var(--gold);
+    box-shadow: 0 3px 10px rgba(40,10,10,.35);
+  }
+  .mobile-bar::-webkit-scrollbar { display: none; }
+  .mb-round { flex: none; color: var(--gold-light); font-weight: 900; font-size: .78rem; padding: 0 2px; }
+  .mb-chip {
+    flex: 1 0 auto; min-width: 0; display: flex; align-items: center; gap: 6px;
+    background: rgba(255,248,232,.12); border: 2px solid transparent; border-radius: 999px;
+    padding: 2px 10px 2px 2px; color: #fff; transition: background .2s, border-color .2s;
+  }
+  .mb-chip.current { background: var(--cream); color: var(--ink); border-color: #ffd34d; box-shadow: 0 0 0 2px rgba(255,211,77,.35); }
+  .mb-chip.out { opacity: .4; }
+  .mb-chip .avatar { width: 30px; height: 30px; margin: 0; border-width: 2px; flex: none; }
+  .mb-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+  .mb-name { font-size: .7rem; font-weight: 700; opacity: .85; max-width: 6.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mb-money { font-size: .92rem; font-weight: 900; color: #ffe08a; font-variant-numeric: lining-nums tabular-nums; }
+  .mb-chip.current .mb-money { color: var(--green); }
+  .game-layout { padding-top: 10px; }
+  /* 4 to 6 players: drop names so more chips fit; the bar scrolls to the current player */
+  .mobile-bar.many .mb-chip { flex: 1 0 auto; padding-right: 7px; gap: 4px; }
+  .mobile-bar.many .mb-chip .avatar { width: 26px; height: 26px; }
+  .mobile-bar.many .mb-name { display: none; }
+  .mobile-bar.many .mb-money { font-size: .8rem; }
+}
+@media (max-width: 600px) {
+  #game.active .mobile-bar.many { gap: 4px; padding: 5px 6px; }
+  .mobile-bar.many .mb-round { display: none; }
+}
+@media (max-width: 380px) {
+  .mobile-bar.many .mb-chip .avatar { width: 22px; height: 22px; }
+  .mobile-bar.many .mb-money { font-size: .72rem; }
+}
+
+/* desktop: board and sidebar sit together in the middle, sidebar fills the height */
+@media (min-width: 1001px) {
+  .game-layout {
+    grid-template-columns: minmax(0, calc(100vh - 32px)) minmax(320px, 380px);
+    justify-content: center; align-items: stretch; max-width: none; gap: 24px;
+  }
+  .game-board-wrap { margin: 0; max-width: none; }
+  .sidebar { height: calc(100vh - 32px); max-height: none; }
+  .sidebar .log { flex: 1 1 auto; max-height: none; min-height: 80px; }
+}
+
+/* phone home screen: one big Play button, the rest in a tidy 2-column grid */
+@media (max-width: 600px) {
+  .hero-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hero-buttons .btn { width: 100%; font-size: 1rem; padding: .8em .6em; }
+  .hero-buttons .btn[data-action="play"] { grid-column: 1 / -1; font-size: 1.35rem; padding: .85em; box-shadow: 0 4px 0 var(--maroon-dark), 0 8px 18px rgba(110,26,44,.3); }
+  #resumeBtn { display: block; margin: 8px auto 0; }
+}
