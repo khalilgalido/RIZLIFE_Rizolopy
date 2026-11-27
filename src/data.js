@@ -149,4 +149,6 @@ export const RULES = {
   // rent multipliers on base rent (price / 10) for 0..3 landmarks
   upgradeMultipliers: [1, 5, 12, 25],
   monopolyMultiplier: 2,
+  mortgageInterest: 0.1, // lifting a mortgage costs its value plus 10%
+  auctionStart: 10,      // lowest opening bid
 };

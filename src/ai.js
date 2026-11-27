@@ -123,7 +123,8 @@ export function decideExile(ctx, pi) {
 /** Landmarks to build this turn, in order. Returns tile indices (may repeat). */
 export function decideBuilds(ctx, pi) {
   const p = ctx.G.players[pi];
-  const owned = ctx.propsOf(pi).filter(i => ctx.ownsGroup(pi, TILES[i].group));
+  const mortgagedGroup = g => ctx.groupTiles(g).some(k => ctx.G.owned[k] && ctx.G.owned[k].mortgaged);
+  const owned = ctx.propsOf(pi).filter(i => ctx.ownsGroup(pi, TILES[i].group) && !mortgagedGroup(TILES[i].group));
   if (!owned.length) return [];
   const levels = {};
   owned.forEach(i => { levels[i] = ctx.G.owned[i].level; });
@@ -132,7 +133,7 @@ export function decideBuilds(ctx, pi) {
 
   if (p.ai === "easy") {
     if (Math.random() < 0.5) return [];
-    const i = owned.find(k => levels[k] < RULES.maxUpgrades && money - ctx.upgradeCost(k) >= 350);
+    const i = owned.find(k => ctx.canBuildOn(pi, k) && money - ctx.upgradeCost(k) >= 350);
     return i === undefined ? [] : [i];
   }
 
@@ -155,6 +156,46 @@ export function decideBuilds(ctx, pi) {
     out.push(k);
   }
   return out;
+}
+
+/** Mortgages to lift this turn: full groups first, while keeping a cushion. */
+export function decideLifts(ctx, pi) {
+  const p = ctx.G.players[pi];
+  const keep = p.ai === "easy" ? 300 : reserve(ctx, pi) + 60;
+  const mine = ctx.propsOf(pi).filter(i => ctx.G.owned[i].mortgaged);
+  mine.sort((a, b) => (ctx.ownsGroup(pi, TILES[b].group) - ctx.ownsGroup(pi, TILES[a].group)) || TILES[b].price - TILES[a].price);
+  let money = p.money;
+  const out = [];
+  for (const i of mine) {
+    if (money - ctx.liftCost(i) < keep) continue;
+    money -= ctx.liftCost(i);
+    out.push(i);
+  }
+  return out;
+}
+
+/** The most the CPU would pay for tile i at auction. */
+function auctionLimit(ctx, pi, i) {
+  const p = ctx.G.players[pi];
+  const t = TILES[i];
+  const gs = groupStatus(ctx, pi, t.group);
+  let worth = t.price;
+  if (gs.mine === gs.size - 1) worth *= 1.6;                                    // finishes our group
+  else if (Object.values(gs.others).some(n => n === gs.size - 1)) worth *= 1.3; // stops someone finishing theirs
+  else if (Object.keys(gs.others).length && !gs.mine) worth *= 0.8;
+  if (p.ai === "easy") return Math.min(worth * 0.9, p.money - 80);
+  if (roundsLeft(ctx.G) <= 2) worth = Math.min(worth, t.price); // late on, only bargains pay off
+  return Math.min(worth, p.money - reserve(ctx, pi) * 0.6);
+}
+
+/** Auction move: the smallest raise that stays under the CPU's limit, or "pass". */
+export function decideBid(ctx, pi, i, bid, options) {
+  const limit = auctionLimit(ctx, pi, i);
+  const ok = options.filter(v => v <= limit);
+  if (!ok.length) return "pass";
+  // jump ahead now and then when far below the limit, so auctions don't drag on
+  const pick = ok.length > 1 && limit - bid > 150 && Math.random() < 0.5 ? ok[1] : ok[0];
+  return String(pick);
 }
 
 /** Index of the answer the CPU picks for quiz question q. */
