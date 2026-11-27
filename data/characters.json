@@ -1,0 +1,78 @@
+{
+  "_about": "The 8 playable characters from the character select screenshot. 'color' is sampled from each token's circle. 'bio' is a longer note for an info panel and is not in the screenshot.",
+  "characters": [
+    {
+      "id": "jose-rizal",
+      "name": "José Rizal",
+      "kind": "historical",
+      "icon": "🎓",
+      "color": "#6B1A2B",
+      "tagline": "Physician, writer and national hero from Calamba, Laguna.",
+      "bio": "Born in Calamba in 1861, Rizal trained as an eye doctor in Europe and wrote Noli Me Tangere (1887) and El Filibusterismo (1891). He was executed at Bagumbayan on 30 December 1896."
+    },
+    {
+      "id": "josephine-bracken",
+      "name": "Josephine Bracken",
+      "kind": "historical",
+      "icon": "🌹",
+      "color": "#1E4D3A",
+      "tagline": "Irish-born companion of Rizal during his exile in Dapitan.",
+      "bio": "Josephine Bracken came to Dapitan in 1895 with her adoptive father, who sought Rizal's help for his eyes. She stayed and lived with Rizal at Talisay.",
+      "flag": "The screenshot says 'Irish-born'. Most sources say she was born in Hong Kong to Irish parents, so 'Irish' may be safer."
+    },
+    {
+      "id": "paciano",
+      "name": "Paciano",
+      "kind": "historical",
+      "icon": "🌾",
+      "color": "#7B4A26",
+      "tagline": "Rizal's elder brother and lifelong supporter.",
+      "bio": "Paciano Rizal, the only other son of the family, paid for much of José's studies abroad and later became a general in the Philippine Revolution."
+    },
+    {
+      "id": "leonor-rivera",
+      "name": "Leonor Rivera",
+      "kind": "historical",
+      "icon": "🎻",
+      "color": "#E48DB8",
+      "tagline": "Rizal's childhood sweetheart from Camiling, Tarlac.",
+      "bio": "Rizal's cousin and sweetheart, who wrote to him for years while he was in Europe. She married the Englishman Henry Kipping in 1890 at her mother's wish. She is often said to be the model for Maria Clara."
+    },
+    {
+      "id": "crisostomo-ibarra",
+      "name": "Crisostomo Ibarra",
+      "kind": "fictional",
+      "icon": "📜",
+      "color": "#1F3A78",
+      "tagline": "Fictional idealist who returns from Europe in Noli Me Tangere.",
+      "bio": "The hero of the Noli. He comes home to San Diego after seven years in Europe and wants to build a school, but the friars turn the town against him."
+    },
+    {
+      "id": "maria-clara",
+      "name": "Maria Clara",
+      "kind": "fictional",
+      "icon": "🌸",
+      "color": "#B8913A",
+      "tagline": "Fictional heroine of the Noli, Ibarra's beloved.",
+      "bio": "The daughter of Capitan Tiago and Ibarra's fiancée. At the end of the Noli she enters the Santa Clara convent."
+    },
+    {
+      "id": "elias",
+      "name": "Elias",
+      "kind": "fictional",
+      "icon": "🚣",
+      "color": "#2E7A8A",
+      "tagline": "Fictional boatman and rebel, loyal friend of Ibarra.",
+      "bio": "A mysterious boatman who saves Ibarra's life more than once and dies helping him escape at the end of the Noli."
+    },
+    {
+      "id": "padre-damaso",
+      "name": "Padre Damaso",
+      "kind": "fictional",
+      "icon": "⛪",
+      "color": "#3B2A2A",
+      "tagline": "Fictional domineering friar, antagonist of the Noli.",
+      "bio": "The Franciscan friar who was parish priest of San Diego. He insults Ibarra's late father and is revealed to be Maria Clara's real father."
+    }
+  ]
+}
