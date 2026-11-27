@@ -1,7 +1,7 @@
 /* Rizolopy interactive tutorial.
    A scripted two-player practice game: the dice, the cards and the quiz question are
-   fixed so every new player sees buying, rent, NOLI and FILI cards, Dapitan Exile and
-   Quiz Corner in about two minutes. The game itself runs normally; this module only
+   fixed so every new player sees buying, rent, NOLI and FILI cards, Dapitan Exile,
+   Quiz Corner, trading, an auction and a mortgage in a few minutes. The game itself runs normally; this module only
    picks the dice, listens to game events and draws a coach bubble with a spotlight. */
 import "./tutorial.css";
 
@@ -21,6 +21,7 @@ const DICE = [
   [5, 6], // You: Intramuros -> FILI (card pays ₱200)
   [3, 5], // Friend: leaves Dapitan -> Café Rest (in exile this becomes doubles 4 + 4)
   [2, 4], // You: FILI -> Quiz Corner
+  [1, 2], // Friend: Café Rest -> Ghent (skip it: auction)
 ];
 /* Which card or question each deck hands out first (index into the data lists). */
 const FORCED_DRAWS = { noliDeck: 5, filiDeck: 0, quizDeck: 6 };
@@ -30,7 +31,8 @@ const peso = n => "₱" + Math.round(n).toLocaleString("en-PH");
 /* ---------- the script ----------
    wait:   game event that moves to the next step (no wait = a Next button)
    target: what to spotlight: "roll" | "end" | "dice" | {tile} | "modal" | "modalBtn" | CSS selector
-   silent: no bubble, just wait for the event */
+   silent: no bubble, just wait for the event
+   allowTrade / allowSkip: the Trade button / the Skip button on a buy offer work during this step */
 const STEPS = [
   { silent: true, wait: "turnStart" },
   { title: "Welcome to Rizolopy!", text: `This short practice game shows you how to play. You control both players, just like passing one phone around a group. You can skip it at any time.` },
@@ -79,11 +81,42 @@ const STEPS = [
   { target: "roll", title: "Last roll", text: `One more roll for you.`, wait: "rolled", tap: true },
   { silent: true, wait: "quiz" },
   { target: "modal", title: "Quiz Corner", text: `Answer a question about Rizal's life. Get it right for <b>₱100</b>. (Hint: you just learned this one.)`, wait: "quizDone", tap: true },
-  { final: true, title: "You're ready!", text: d => `${d.correct ? "Correct! " : ""}A few more things you'll meet in a real game:
+  { target: "#tradeBtn", title: "Trading", allowTrade: true, wait: "tradeOpen", tap: true,
+    text: d => `${d.correct ? "Correct! " : ""}On your turn you can also <b>trade</b> with other players. Friend owns Intramuros, in the same colour group as your Ateneo. Tap <b>Trade</b>.` },
+  { target: "modal", title: "Make an offer", allowTrade: true, wait: "tradeOffer", tap: true,
+    text: `We filled in an offer for you: <b>₱150</b> for Friend's <b>Intramuros</b>. You can tick places and type Piso on either side, and swap Blumentritt letters too. Tap <b>Send offer</b>.` },
+  { target: "modal", title: "Friend decides", wait: "tradeDone", tap: true,
+    text: `Now Friend answers. On one phone you pass it over, and online the offer pops up on their own phone. Computer players decide for themselves. Accept it for Friend.` },
+  { target: "#myProps", title: d => d.accepted ? "Deal!" : "No deal",
+    text: d => d.accepted ? `Intramuros is yours now. Places can't be traded while any place in their colour group has landmarks.` : `Friend said no, and that's fine. Anyone can turn down a trade they don't like.` },
+  { target: "end", title: "End your turn", text: `Tap <b>End Turn</b>.`, wait: "turnEnded", tap: true },
+
+  { silent: true, wait: "turnStart" },
+  { target: "roll", title: "Friend's turn", text: `Roll for Friend.`, wait: "rolled", tap: true },
+  { silent: true, wait: "buyOffer" },
+  { target: "modal", title: "Skip it", allowSkip: true, wait: "auctionStart", tap: true,
+    text: `Friend landed on <b>Ghent</b>. This time tap <b>Skip</b>. When a player doesn't buy a place, it goes up for <b>auction</b>.` },
+  { target: "modal", title: "Auction", wait: "auctionDone", tap: true,
+    text: `Players take turns raising the bid by ₱10, ₱50 or ₱100, or dropping out. The last player left pays their bid. Bid for both of you until someone wins.` },
+  { target: "#playerList", title: d => d.winner ? "Sold!" : "No bids",
+    text: d => d.winner ? `<b>${d.winner}</b> won Ghent for <b>${peso(d.bid)}</b>. An auction can be a bargain, because bids start at just ₱10.` : `Nobody bid, so Ghent stays with the bank for now.` },
+  { target: "end", title: "End Friend's turn", text: `Tap <b>End Turn</b> and pass the device back.`, wait: "turnEnded", tap: true },
+
+  { silent: true, wait: "turnStart" },
+  { target: "#myProps", title: "Mortgages", wait: "mortgaged", tap: true,
+    text: `Short on Piso? You can <b>mortgage</b> a place to the bank for half its price. Tap <b>Mortgage</b> next to one of your places.` },
+  { target: "#myProps", title: "Lift the mortgage", wait: "lifted", tap: true,
+    text: `A mortgaged place charges <b>no rent</b>. Tap <b>Lift</b> to pay the bank back, plus 10%.` },
+  { title: "Landmarks and bankruptcy", text: `Two more rules for later:
+      <ul>
+        <li>Own a whole <b>colour group</b> to build up to 3 <b>landmarks 🏛</b> per place. Build <b>evenly</b>: every place in the group needs one before any gets a second. Tap <b>−🏛</b> to sell one back for half price.</li>
+        <li>If you can't pay, the bank sells your landmarks and mortgages your places for you. If that's still not enough you're <b>bankrupt</b>, and the player you owe takes everything you have left.</li>
+      </ul>` },
+  { final: true, title: "You're ready!", text: `A few more things you'll meet in a real game:
       <ul>
         <li><b>Doubles</b> let you roll again.</li>
-        <li>Own a whole <b>colour group</b> and you can build up to 3 <b>landmarks 🏛</b> from the sidebar, which raise rent a lot.</li>
         <li>Passing <b>START</b> pays ₱200.</li>
+        <li>You can make up to 3 trade offers on each turn.</li>
         <li>The game ends at the round limit or when one player is left. Highest <b>net worth</b> wins.</li>
       </ul>` },
 ];
@@ -160,6 +193,7 @@ export function createTutorial({ getBoard, onExit }) {
     if (s.silent) return;
     const n = STEPS.slice(0, idx + 1).filter(x => !x.silent).length;
     const text = typeof s.text === "function" ? s.text(data) : s.text;
+    const title = typeof s.title === "function" ? s.title(data) : s.title;
     let buttons;
     if (s.final) {
       buttons = `<button class="btn btn-outline" data-tut="home">Back to menu</button>
@@ -173,7 +207,7 @@ export function createTutorial({ getBoard, onExit }) {
         <button class="btn btn-maroon" data-tut="next">Next</button>`;
     }
     bubble.innerHTML = `<div class="tut-head"><span class="tut-coach">🎓</span>
-        <span class="tut-title">${s.title || "Tutorial"}</span><span class="tut-count">${n} / ${COUNTED}</span></div>
+        <span class="tut-title">${title || "Tutorial"}</span><span class="tut-count">${n} / ${COUNTED}</span></div>
       <div class="tut-text">${text}</div><div class="tut-buttons">${buttons}</div>`;
     bubble.classList.remove("pop");
     void bubble.offsetWidth;
@@ -329,6 +363,8 @@ export function createTutorial({ getBoard, onExit }) {
     get active() { return active; },
     justPressed: () => active && Date.now() - lastPress < 500,
     start, stop, emit, rollFor, forceDraw,
+    /** does the current step let the player use the Trade button / skip a buy? */
+    allows: what => active && !!STEPS[idx] && !!STEPS[idx][what],
   };
 }
 

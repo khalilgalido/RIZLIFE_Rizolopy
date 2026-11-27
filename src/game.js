@@ -136,6 +136,8 @@ export function boot() {
     return Object.keys(G.owned).map(Number).filter(i => G.owned[i].owner === pi).sort((a, b) => a - b);
   }
 
+  /** verb that agrees with a player name (the tutorial player is called "You") */
+  function vb(p, third, base) { return p && p.name === "You" ? base : third; }
   function activePlayers() { return G.players.filter(p => !p.bankrupt); }
   function cur() { return G.players[G.turn]; }
 
@@ -487,7 +489,7 @@ export function boot() {
       body: `${deedHtml(i)}<p>${can ? `Buy <b>${esc(t.name)}</b> for <b>${peso(t.price)}</b>? You have ${peso(p.money)}.`
         : `You need ${peso(t.price)} but only have ${peso(p.money)}.`}</p>`,
       buttons: [
-        { label: "Skip", value: "skip", cls: "btn-outline", disabled: tut.active },
+        { label: "Skip", value: "skip", cls: "btn-outline", disabled: tut.active && !tut.allows("allowSkip") },
         { label: `Buy for ${peso(t.price)}`, value: "buy", cls: "btn-maroon", disabled: !can },
       ],
       ai: AI.isAI(p) ? AI.decideBuy(aiCtx(), pi, i) : undefined,
@@ -509,7 +511,7 @@ export function boot() {
       }
     } else {
       G.msg = `${p.name} decided not to buy ${t.name}.`;
-      if (!G.tutorial) await auction(i);
+      await auction(i);
     }
   }
 
@@ -526,6 +528,7 @@ export function boot() {
     }
     let live = order.filter(pi => G.players[pi].money >= RULES.auctionStart);
     if (!live.length) return;
+    tut.emit("auctionStart");
     let bid = 0, leader = -1;
     log(`🔨 ${t.name} goes up for auction.`);
     sfx("coin");
@@ -553,15 +556,16 @@ export function boot() {
       if (!G || G.phase === "over") return;
       if (choice === "pass" || isNaN(Number(choice))) {
         live.splice(at, 1);
-        log(`${p.name} drops out of the auction.`);
+        log(`${p.name} ${vb(p, "drops", "drop")} out of the auction.`);
       } else {
         bid = Number(choice); leader = pi; at++;
-        log(`${p.name} bids ${peso(bid)} for ${t.name}.`);
+        log(`${p.name} ${vb(p, "bids", "bid")} ${peso(bid)} for ${t.name}.`);
       }
     }
     if (leader < 0) {
       G.msg = `Nobody bid on ${t.name}. It stays with the bank.`;
       log(G.msg); refresh();
+      tut.emit("auctionDone", { winner: null });
       return;
     }
     const w = G.players[leader];
@@ -570,9 +574,10 @@ export function boot() {
     stat(leader, "bought", 1);
     sfx("coin");
     stampTile(i);
-    log(`🔨 ${w.name} wins ${t.name} at auction for ${peso(bid)}.`);
+    log(`🔨 ${w.name} ${vb(w, "wins", "win")} ${t.name} at auction for ${peso(bid)}.`);
     G.msg = `${w.name} won ${t.name} for ${peso(bid)}!`;
     refresh();
+    tut.emit("auctionDone", { winner: w.name, bid });
     toast(G.msg, true);
     if (ownsGroup(leader, t.group)) {
       log(`${w.name} now owns all of ${GROUPS[t.group].name}. Rent doubles and landmarks can be built.`);
@@ -835,6 +840,7 @@ export function boot() {
     log(`${p.name} mortgaged ${TILES[i].name} for ${peso(mortgageValue(i))}. It charges no rent until the mortgage is lifted.`);
     toast(`${TILES[i].name} mortgaged for ${peso(mortgageValue(i))}`, true);
     save(); refresh();
+    tut.emit("mortgaged");
   }
   function liftMortgage(i, fromAI) {
     if (!ownTurnOk(fromAI)) return;
@@ -849,13 +855,15 @@ export function boot() {
     log(`${p.name} lifted the mortgage on ${TILES[i].name} for ${peso(cost)}.`);
     toast(`${TILES[i].name} earns rent again`, true);
     save(); refresh();
+    tut.emit("lifted");
   }
 
   /* =========================================================
      Trading
      ========================================================= */
   function canTradeNow() {
-    if (!G || G.tutorial || busy || G.phase === "over" || (G.phase !== "roll" && G.phase !== "end")) return false;
+    if (!G || busy || G.phase === "over" || (G.phase !== "roll" && G.phase !== "end")) return false;
+    if (G.tutorial && !tut.allows("allowTrade")) return false;
     if (!canAct() || aiSeat() || activePlayers().length < 2) return false;
     if (NET && NET.mySeat !== G.turn) return false;
     return (G.trades || 0) < Trade.MAX_TRADES_PER_TURN;
@@ -878,6 +886,11 @@ export function boot() {
     const partners = G.players.map((p, k) => k).filter(k => k !== me && !G.players[k].bankrupt);
     const o = Trade.emptyOffer(me, partners[0]);
     const ctx = aiCtx();
+    if (G.tutorial) { // the tutorial fills in a sensible first offer
+      const want = propsOf(o.to).find(i => Trade.tradable(ctx, i) && TILES[i].group === "lightblue");
+      if (want !== undefined) o.get = [want];
+      o.giveMoney = Math.min(150, G.players[me].money);
+    }
     const placeList = (pi, chosen) => {
       const mine = propsOf(pi);
       if (!mine.length) return `<p class="muted">No places.</p>`;
@@ -924,6 +937,7 @@ export function boot() {
       },
     });
     bind();
+    tut.emit("tradeOpen");
   }
 
   function submitTrade(o) { requestAct("trade", undefined, o); }
@@ -939,8 +953,8 @@ export function boot() {
     const A = G.players[o.from], B = G.players[o.to];
     busy = true;
     G.trades = (G.trades || 0) + 1;
-    G.msg = `${A.name} offers ${B.name} a trade.`;
-    log(`🤝 ${A.name} offers ${B.name} a trade.`);
+    G.msg = `${A.name} ${vb(A, "offers", "offer")} ${B.name} a trade.`;
+    log(`🤝 ${A.name} ${vb(A, "offers", "offer")} ${B.name} a trade.`);
     refresh();
     try {
       let answer;
@@ -955,15 +969,16 @@ export function boot() {
         answer = await modal({
           body: `<h2>🤝 Trade offer for ${esc(B.name)}</h2>${pass}<p><b>${esc(A.name)}</b> wants to trade:</p>${tradeSummaryHtml(o)}`,
           buttons: [{ label: "No thanks", value: "decline", cls: "btn-outline" }, { label: "Accept trade", value: "accept", cls: "btn-green" }],
-          decider: o.to, human: true,
+          decider: o.to, human: true, onOpen: () => tut.emit("tradeOffer"),
         });
       }
       if (!G || G.phase === "over") return;
+      tut.emit("tradeDone", { accepted: answer === "accept" });
       if (answer === "accept" && !Trade.checkOffer(aiCtx(), o)) {
         const done = Trade.applyOffer(aiCtx(), o);
         [...o.give, ...o.get].forEach(i => stampTile(i));
         sfx("coin");
-        log(`🤝 ${B.name} accepted ${A.name}'s trade.`);
+        log(`🤝 ${B.name} accepted ${A.name === "You" ? "your" : A.name + "'s"} trade.`);
         G.msg = `${A.name} and ${B.name} made a trade!`;
         toast(G.msg, true);
         const completed = [...done.from.map(g => [A, g]), ...done.to.map(g => [B, g])];
@@ -972,7 +987,7 @@ export function boot() {
       } else {
         G.tradeMemo = G.tradeMemo || {};
         G.tradeMemo[Trade.offerKey(o)] = G.round;
-        log(`${B.name} turned down ${A.name}'s trade.`);
+        log(`${B.name} turned down ${A.name === "You" ? "your" : A.name + "'s"} trade.`);
         G.msg = `${B.name} said no to the trade.`;
         if (!AI.isAI(B)) toast(G.msg, true);
       }
@@ -1041,8 +1056,9 @@ export function boot() {
       }).join("");
     const tradeBtn = $("#tradeBtn");
     if (tradeBtn) {
-      tradeBtn.classList.toggle("hidden", !G || !!G.tutorial || activePlayers().length < 2);
-      tradeBtn.disabled = !canTradeNow();
+      tradeBtn.classList.toggle("hidden", !G || activePlayers().length < 2);
+      // in the tutorial the coach decides when trading opens, so the button only checks on tap
+      tradeBtn.disabled = !canTradeNow() && !G.tutorial;
       tradeBtn.title = canTradeNow() ? "Offer a trade to another player" : "You can trade on your own turn";
     }
 
