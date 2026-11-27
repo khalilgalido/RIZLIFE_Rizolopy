@@ -9,6 +9,7 @@ import { createTutorial, tutorialSeen, markSeen, TUTORIAL_PLAYERS } from "./tuto
 import { initOnline } from "./online.js";
 import { initCertificates, newStats } from "./certificate.js";
 import { createChat, makeChatGate } from "./chat.js";
+import { clampMoney, moneyPickerHtml, moneyLabel } from "./money.js";
 
 export function boot() {
 
@@ -243,9 +244,10 @@ export function boot() {
      Turn flow
      ========================================================= */
   function newGame(setup) {
+    const startMoney = clampMoney(setup.startMoney ?? RULES.startMoney);
     G = {
       players: setup.players.map(s => ({
-        name: s.name, char: s.char, money: RULES.startMoney, pos: 0,
+        name: s.name, char: s.char, money: startMoney, pos: 0,
         inExile: false, exileTries: 0, freeExit: 0, bankrupt: false, ai: s.ai || null,
         stats: newStats(),
       })),
@@ -256,6 +258,7 @@ export function boot() {
       turn: 0,
       round: 1,
       maxRounds: setup.maxRounds,
+      startMoney,
       doubles: 0,
       phase: "roll",        // roll | end | over
       lastDice: [1, 1],
@@ -993,7 +996,7 @@ export function boot() {
   function rulesHtml() {
     return `<h2>How to Play</h2>
       <ol class="rules-list">
-        <li>2 to 6 players share one device. Each picks a character and starts with <b>${peso(RULES.startMoney)}</b>.</li>
+        <li>2 to 6 players share one device. Each picks a character and starts with <b>${peso(G && G.startMoney ? G.startMoney : RULES.startMoney)}</b>${G && G.startMoney ? "" : " (or the amount chosen on the setup screen)"}.</li>
         <li>On your turn, <b>roll two dice</b> and move counter-clockwise. Passing <b>START</b> pays ${peso(RULES.passStart)}.</li>
         <li>Land on an unowned place to <b>buy</b> it. Land on someone else's place and you <b>pay rent</b>.</li>
         <li>Own every place in a colour group to <b>double the rent</b> and build up to ${RULES.maxUpgrades} <b>landmarks 🏛</b> on each, which raise rent a lot.</li>
@@ -1048,6 +1051,8 @@ export function boot() {
   const setup = {
     count: 2,
     maxRounds: 20,
+    startMoney: RULES.startMoney,
+    moneyCustom: false,
     aiSpeed: "normal",
     slots: Array.from({ length: 6 }, (_, i) => ({ name: `Player ${i + 1}`, char: CHARACTERS[i].id, ai: null })),
   };
@@ -1080,6 +1085,16 @@ export function boot() {
     $("#roundLimit").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
       setup.maxRounds = Number(b.dataset.r); renderSetup();
     }));
+    $("#startMoney").innerHTML = moneyPickerHtml(setup.startMoney, setup.moneyCustom, "money");
+    $("#startMoney").querySelectorAll("button[data-money]").forEach(b => b.addEventListener("click", () => {
+      if (b.dataset.money === "custom") setup.moneyCustom = true;
+      else { setup.moneyCustom = false; setup.startMoney = Number(b.dataset.money); }
+      renderSetup();
+      if (setup.moneyCustom) $("#startMoney input")?.focus();
+    }));
+    $("#startMoney input")?.addEventListener("change", e => {
+      setup.startMoney = clampMoney(e.target.value); e.target.value = setup.startMoney;
+    });
 
     // computer speed row, only when a CPU is seated
     let speedRow = $("#aiSpeedRow");
@@ -1088,7 +1103,7 @@ export function boot() {
       speedRow.className = "setup-row";
       speedRow.id = "aiSpeedRow";
       speedRow.innerHTML = `<label>Computer speed</label><div class="seg" id="aiSpeed"></div>`;
-      $("#roundLimit").closest(".setup-row").after(speedRow);
+      $("#startMoney").closest(".setup-row").after(speedRow);
     }
     speedRow.classList.toggle("hidden", !setup.slots.slice(0, setup.count).some(s => s.ai));
     $("#aiSpeed").innerHTML = AI.speedPickerHtml(setup.aiSpeed);
@@ -1136,7 +1151,9 @@ export function boot() {
     const players = setup.slots.slice(0, setup.count).map((s, i) => ({ name: s.name.trim() || `Player ${i + 1}`, char: s.char, ai: s.ai }));
     const names = players.map(p => p.name.toLowerCase());
     if (new Set(names).size !== names.length) { $("#setupError").textContent = "Each player needs a different name."; return; }
-    newGame({ players, maxRounds: setup.maxRounds });
+    const box = $("#startMoney input");
+    if (box) setup.startMoney = clampMoney(box.value);
+    newGame({ players, maxRounds: setup.maxRounds, startMoney: setup.startMoney, aiSpeed: setup.aiSpeed });
     enterGame();
   }
 
@@ -1226,9 +1243,9 @@ export function boot() {
     if (a === "roll") onRoll(); else if (a === "end") onEndTurn(); else if (a === "build") build(i);
   }
 
-  function hostStart(room, players, maxRounds, hostCid) {
+  function hostStart(room, players, maxRounds, hostCid, startMoney) {
     NET = { role: "host", room, cid: hostCid, mySeat: -1 };
-    newGame({ players, maxRounds });
+    newGame({ players, maxRounds, startMoney });
     G.players.forEach((p, i) => { p.cid = players[i].cid; });
     G.online = { code: room.code };
     NET.mySeat = seatOfCid(hostCid);

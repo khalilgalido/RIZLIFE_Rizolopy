@@ -654,3 +654,10 @@ img.portrait { width: 100%; height: 100%; border-radius: 50%; display: block; ob
 .ol-cpu-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .ol-cpu-btns { display: flex; gap: 8px; margin: 8px 0 4px; flex-wrap: wrap; }
 .ol-cpu p { margin: 4px 0 0; }
+
+/* starting money picker */
+.seg button small { font-weight: 400; opacity: .75; font-size: .8em; }
+.money-custom { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; flex-wrap: wrap; }
+.money-custom input { width: 7em; padding: .35em .5em; border: 2px solid var(--gold); border-radius: 8px; font: inherit; font-weight: 700; }
+.money-hint { font-weight: 400; font-size: .85em; }
+.ol-settings { text-align: center; margin: 0 0 8px; }
