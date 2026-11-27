@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><ellipse cx="64" cy="116" rx="44" ry="6" fill="#2b1611" opacity=".18"/>
+    <path d="M64 70 C60 90 56 100 50 112 M64 80 c10 -6 22 -4 28 4 c-10 6 -22 4 -28 -4" stroke="#1e4d3a" stroke-width="4" fill="#4f9a5a" stroke-linecap="round"/>
+    <g transform="translate(64 50)">
+      <ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" transform="rotate(0)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" transform="rotate(72)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" transform="rotate(144)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" transform="rotate(216)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="4" stroke-linejoin="round" stroke-linecap="round" transform="rotate(288)"/>
+      <circle r="11" fill="#f1d58a" stroke="#2b1611" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/><circle r="4" fill="#d4a23c"/>
+    </g>
+    <g transform="translate(28 84) scale(.45)">
+      <ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="7" transform="rotate(0)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="7" transform="rotate(72)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="7" transform="rotate(144)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="7" transform="rotate(216)"/><ellipse cx="0" cy="-20" rx="13" ry="17" fill="#7fc3e3" stroke="#2b1611" stroke-width="7" transform="rotate(288)"/>
+      <circle r="10" fill="#f1d58a" stroke="#2b1611" stroke-width="7"/>
+    </g></svg>
