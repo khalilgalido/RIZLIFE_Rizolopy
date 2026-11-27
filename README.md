@@ -2,10 +2,6 @@
 
 A Monopoly-style Philippine history board game that follows the life of José Rizal, from Calamba to Bagumbayan. 2 to 6 players share one device (hot seat).
 
-## Play
-
-- **Easiest:** download `index.html` from the latest build and double-click it. It is one self-contained file.
-- **Online:** every push to `main` deploys to GitHub Pages. Turn this on once in *Settings → Pages → Source: GitHub Actions*.
 
 ## Develop
 
